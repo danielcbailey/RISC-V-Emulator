@@ -1,0 +1,79 @@
+<html>
+    <head>
+        <title>RISCV Emulator</title>
+    </head>
+    <body style="background-color: #1E1E1E;">
+        <h1 style="color: white; display: inline-block;">RISCV Emulator</h1>
+        <button id="runButton" style="margin-left: 50px; height: 40px; width: 80px;">RUN</button>
+        <br/>
+        <canvas width="1000px" height="700px" style="border: 2px solid white;" id="display"></canvas>
+        <h2 style="color: white;">Console</h2>
+        <div style="width: 980px; padding: 10px; color: white; font-size: 1.2em; font-family: monospace; background-color: black; height: 300px; overflow-y: 'auto'; overflow-x: 'wrap'; border: 2px solid white;" id="console"></div>
+
+        <script>
+            // Connect to the websocket
+            var socket = new WebSocket("ws://localhost:2035/ws");
+
+            var screenWidth = 1000;
+            var screenHeight = 700;
+
+            var consoleText = "";
+
+            // When the socket is opened, listen for messages
+            socket.onopen = function() {
+                socket.onmessage = function(event) {
+                    var data = JSON.parse(event.data);
+                    if (data.type == "console") {
+                        consoleText += data.text.replaceAll("\n", "<br/>");
+                        document.getElementById("console").innerHTML = consoleText;
+                    } else if (data.type == "display") {
+                        let canvas = document.getElementById("display");
+
+                        let dataWidth = data.width;
+                        let dataHeight = data.height;
+
+                        // if the canvas is not the same size as the data, resize it
+                        if (canvas.width != dataWidth || canvas.height != dataHeight) {
+                            canvas.width = dataWidth;
+                            canvas.height = dataHeight;
+                        }
+
+                        var raw = window.atob(data.data);
+                        var rawLength = raw.length;
+                        var array = new Uint8Array(new ArrayBuffer(rawLength));
+
+                        for(i = 0; i < rawLength; i++) {
+                            array[i] = raw.charCodeAt(i);
+                        }
+
+                        var ctx = canvas.getContext("2d");
+                        var imageData = ctx.createImageData(dataWidth, dataHeight);
+                        for (var i = 0; i < dataWidth * dataHeight * 4; i++) {
+                            imageData.data[i * 4 + 0] = array[i * 4 + 0]; // red
+                            imageData.data[i * 4 + 1] = array[i * 4 + 1]; // green
+                            imageData.data[i * 4 + 2] = array[i * 4 + 2]; // blue
+                            imageData.data[i * 4 + 3] = array[i * 4 + 3]; // alpha
+                        }
+                        ctx.putImageData(imageData, 0, 0);
+                    }
+                };
+            };
+
+            // when the socket closes, try to reconnect every 3 seconds
+            socket.onclose = function() {
+                setTimeout(function() {
+                    socket = new WebSocket("ws://localhost:2035");
+                }, 3000);
+            };
+
+            // when the run button is clicked, send a message to the emulator to start running
+            document.getElementById("runButton").onclick = function() {
+                consoleText = "";
+                socket.send(JSON.stringify({
+                    type: "run"
+                }));
+            };
+
+        </script>
+    </body>
+</html>
