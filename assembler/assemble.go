@@ -1049,7 +1049,7 @@ func (a *AssembledResult) parseLines() {
 		directiveLine := strings.TrimLeft(line, " \t\r")
 		if strings.HasPrefix(strings.TrimLeft(directiveLine, " \t\r"), ".text") || strings.HasPrefix(strings.TrimLeft(directiveLine, " \t\r"), ".data") {
 			// directive
-			textSection = strings.HasPrefix(strings.TrimLeft(directiveLine, " \t\r"), ".text")
+			//textSection = strings.HasPrefix(strings.TrimLeft(directiveLine, " \t\r"), ".text") bad change 3
 		} else if textSection {
 			// instruction
 
@@ -1145,7 +1145,7 @@ func (a *AssembledResult) parseLines() {
 				// J-type instruction
 				code, ok := a.parseJTypeInstruction(line, diff, i, opcode)
 				if ok {
-					a.ProgramText = append(a.ProgramText, code&0xFF) //bad change 2
+					a.ProgramText = append(a.ProgramText, code)
 				}
 			} else if opcode == "lui" ||
 				opcode == "auipc" {
