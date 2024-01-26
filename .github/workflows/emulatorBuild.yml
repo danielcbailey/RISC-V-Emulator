@@ -89,11 +89,11 @@ jobs:
           version.txt
 
     - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v3
-        with:
-          aws-access-key-id: ${{ secrets.S3_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.S3_SECRET_KEY }}
-          aws-region: us-east-2
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        aws-access-key-id: ${{ secrets.S3_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.S3_SECRET_KEY }}
+        aws-region: us-east-2
 
     - name: Copy Version File to build
       run: cp version.txt build/
