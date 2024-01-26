@@ -103,10 +103,10 @@ jobs:
 
     - name: Update Version
       uses: shallwefootball/s3-upload-action@master
-        id: S3
-        with:
-          aws_bucket: ${{ secrets.S3_BUCKET }}
-          source_dir: version.txt
-          aws_key_id: ${{ secrets.S3_ACCESS_KEY }}
-          aws_secret_access_key: ${{ secrets.S3_SECRET_KEY }}
+      id: S3
+      with:
+        aws_bucket: ${{ secrets.S3_BUCKET }}
+        source_dir: version.txt
+        aws_key_id: ${{ secrets.S3_ACCESS_KEY }}
+        aws_secret_access_key: ${{ secrets.S3_SECRET_KEY }}
 
