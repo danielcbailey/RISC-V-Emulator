@@ -94,7 +94,6 @@ jobs:
 
     - name: Upload Binaries to S3
       uses: shallwefootball/s3-upload-action@master
-      id: S3
       with:
         aws_bucket: ${{ secrets.S3_BUCKET }}
         source_dir: build
@@ -103,7 +102,6 @@ jobs:
 
     - name: Update Version
       uses: shallwefootball/s3-upload-action@master
-      id: S3
       with:
         aws_bucket: ${{ secrets.S3_BUCKET }}
         source_dir: version.txt
