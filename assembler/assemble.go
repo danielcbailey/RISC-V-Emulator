@@ -1046,9 +1046,10 @@ func (a *AssembledResult) parseLines() {
 		// remove trailing whitespace
 		line = strings.TrimRight(line, " \t\r")
 
-		if strings.HasPrefix(line, ".") && diff == 0 {
+		directiveLine := strings.TrimLeft(line, " \t\r")
+		if strings.HasPrefix(strings.TrimLeft(directiveLine, " \t\r"), ".text") || strings.HasPrefix(strings.TrimLeft(directiveLine, " \t\r"), ".data") {
 			// directive
-			textSection = strings.HasPrefix(line, ".text")
+			textSection = strings.HasPrefix(strings.TrimLeft(directiveLine, " \t\r"), ".text")
 		} else if textSection {
 			// instruction
 
