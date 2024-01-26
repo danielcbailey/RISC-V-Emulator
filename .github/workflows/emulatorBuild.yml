@@ -12,17 +12,103 @@ on:
 jobs:
 
   build:
-    runs-on: [ self-hosted ]
+    runs-on: [ ubuntu-latest ]
     steps:
     - uses: actions/checkout@v3
 
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.19
+        go-version: 1.20
 
-    - name: Build
-      run: go build -v ./...
+    - name: Build Windows x64
+      env:
+        GOOS: windows
+        GOARCH: amd64
+      run: go build -o riscvemulator-win-x64.exe main.go
 
-    - name: Test
-      run: go test -v ./...
+    - name: Build Windows x86
+      env:
+        GOOS: windows
+        GOARCH: 386
+      run: go build -o riscvemulator-win-x86.exe main.go
+
+    - name: Build Windows ARM64
+      env:
+        GOOS: windows
+        GOARCH: arm64
+      run: go build -o riscvemulator-win-arm64.exe main.go
+
+    - name: Build Linux x64
+      env:
+        GOOS: linux
+        GOARCH: amd64
+      run: go build -o riscvemulator-linux-x64 main.go
+
+    - name: Build Linux x86
+      env:
+        GOOS: linux
+        GOARCH: 386
+      run: go build -o riscvemulator-linux-x86 main.go
+
+    - name: Build Linux ARM
+      env:
+        GOOS: linux
+        GOARCH: arm
+      run: go build -o riscvemulator-linux-arm main.go
+
+    - name: Build Linux ARM64
+      env:
+        GOOS: linux
+        GOARCH: arm64
+      run: go build -o riscvemulator-linux-arm64 main.go
+
+    - name: Build MacOS x64
+      env:
+        GOOS: darwin
+        GOARCH: amd64
+      run: go build -o riscvemulator-macos-x64 main.go
+
+    - name: Build MacOS ARM64
+      env:
+        GOOS: darwin
+        GOARCH: arm64
+      run: go build -o riscvemulator-macos-arm64 main.go
+
+    - name: Packaging Artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: "RISC-V Emulator"
+        retention-days: 30
+        path: |
+          riscvemulator-win-x64.exe
+          riscvemulator-win-x86.exe
+          riscvemulator-win-arm64.exe
+          riscvemulator-linux-x64
+          riscvemulator-linux-x86
+          riscvemulator-linux-arm
+          riscvemulator-linux-arm64
+          riscvemulator-macos-x64
+          riscvemulator-macos-arm64
+          version.txt
+
+    - name: Upload to S3
+      uses: shallwefootball/s3-upload-action@master
+      id: S3
+      with:
+        bucket: ${{ secrets.S3_BUCKET }}
+        source: |
+          riscvemulator-win-x64.exe
+          riscvemulator-win-x86.exe
+          riscvemulator-win-arm64.exe
+          riscvemulator-linux-x64
+          riscvemulator-linux-x86
+          riscvemulator-linux-arm
+          riscvemulator-linux-arm64
+          riscvemulator-macos-x64
+          riscvemulator-macos-arm64
+          version.txt
+        target: ${{ secrets.S3_TARGET }}
+        aws_access_key_id: ${{ secrets.S3_ACCESS_KEY }}
+        aws_secret_access_key: ${{ secrets.S3_SECRET_KEY }}
+
