@@ -25,55 +25,55 @@ jobs:
       env:
         GOOS: windows
         GOARCH: amd64
-      run: go build -o riscvemulator-win-x64.exe main.go
+      run: go build -o build/riscvemulator-win-x64.exe main.go
 
     - name: Build Windows x86
       env:
         GOOS: windows
         GOARCH: 386
-      run: go build -o riscvemulator-win-x86.exe main.go
+      run: go build -o build/riscvemulator-win-x86.exe main.go
 
     - name: Build Windows ARM64
       env:
         GOOS: windows
         GOARCH: arm64
-      run: go build -o riscvemulator-win-arm64.exe main.go
+      run: go build -o build/riscvemulator-win-arm64.exe main.go
 
     - name: Build Linux x64
       env:
         GOOS: linux
         GOARCH: amd64
-      run: go build -o riscvemulator-linux-x64 main.go
+      run: go build -o build/riscvemulator-linux-x64 main.go
 
     - name: Build Linux x86
       env:
         GOOS: linux
         GOARCH: 386
-      run: go build -o riscvemulator-linux-x86 main.go
+      run: go build -o build/riscvemulator-linux-x86 main.go
 
     - name: Build Linux ARM
       env:
         GOOS: linux
         GOARCH: arm
-      run: go build -o riscvemulator-linux-arm main.go
+      run: go build -o build/riscvemulator-linux-arm main.go
 
     - name: Build Linux ARM64
       env:
         GOOS: linux
         GOARCH: arm64
-      run: go build -o riscvemulator-linux-arm64 main.go
+      run: go build -o build/riscvemulator-linux-arm64 main.go
 
     - name: Build MacOS x64
       env:
         GOOS: darwin
         GOARCH: amd64
-      run: go build -o riscvemulator-macos-x64 main.go
+      run: go build -o build/riscvemulator-macos-x64 main.go
 
     - name: Build MacOS ARM64
       env:
         GOOS: darwin
         GOARCH: arm64
-      run: go build -o riscvemulator-macos-arm64 main.go
+      run: go build -o build/riscvemulator-macos-arm64 main.go
 
     - name: Packaging Artifacts
       uses: actions/upload-artifact@v2
@@ -81,34 +81,32 @@ jobs:
         name: "RISC-V Emulator"
         retention-days: 30
         path: |
-          riscvemulator-win-x64.exe
-          riscvemulator-win-x86.exe
-          riscvemulator-win-arm64.exe
-          riscvemulator-linux-x64
-          riscvemulator-linux-x86
-          riscvemulator-linux-arm
-          riscvemulator-linux-arm64
-          riscvemulator-macos-x64
-          riscvemulator-macos-arm64
+          build/riscvemulator-win-x64.exe
+          build/riscvemulator-win-x86.exe
+          build/riscvemulator-win-arm64.exe
+          build/riscvemulator-linux-x64
+          build/riscvemulator-linux-x86
+          build/riscvemulator-linux-arm
+          build/riscvemulator-linux-arm64
+          build/riscvemulator-macos-x64
+          build/riscvemulator-macos-arm64
           version.txt
 
-    - name: Upload to S3
+    - name: Upload Binaries to S3
       uses: shallwefootball/s3-upload-action@master
       id: S3
       with:
-        bucket: ${{ secrets.S3_BUCKET }}
-        source: |
-          riscvemulator-win-x64.exe
-          riscvemulator-win-x86.exe
-          riscvemulator-win-arm64.exe
-          riscvemulator-linux-x64
-          riscvemulator-linux-x86
-          riscvemulator-linux-arm
-          riscvemulator-linux-arm64
-          riscvemulator-macos-x64
-          riscvemulator-macos-arm64
-          version.txt
-        target: ${{ secrets.S3_TARGET }}
-        aws_access_key_id: ${{ secrets.S3_ACCESS_KEY }}
+        aws_bucket: ${{ secrets.S3_BUCKET }}
+        source_dir: build
+        aws_key_id: ${{ secrets.S3_ACCESS_KEY }}
         aws_secret_access_key: ${{ secrets.S3_SECRET_KEY }}
+
+    - name: Update Version
+      uses: shallwefootball/s3-upload-action@master
+        id: S3
+        with:
+          aws_bucket: ${{ secrets.S3_BUCKET }}
+          source_dir: version.txt
+          aws_key_id: ${{ secrets.S3_ACCESS_KEY }}
+          aws_secret_access_key: ${{ secrets.S3_SECRET_KEY }}
 
