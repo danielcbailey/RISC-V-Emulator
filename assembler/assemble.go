@@ -1145,7 +1145,7 @@ func (a *AssembledResult) parseLines() {
 				// J-type instruction
 				code, ok := a.parseJTypeInstruction(line, diff, i, opcode)
 				if ok {
-					a.ProgramText = append(a.ProgramText, code)
+					//a.ProgramText = append(a.ProgramText, code) bad change
 				}
 			} else if opcode == "lui" ||
 				opcode == "auipc" {
