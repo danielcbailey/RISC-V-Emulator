@@ -1049,7 +1049,7 @@ func (a *AssembledResult) parseLines() {
 		directiveLine := strings.TrimLeft(line, " \t\r")
 		if strings.HasPrefix(strings.TrimLeft(directiveLine, " \t\r"), ".text") || strings.HasPrefix(strings.TrimLeft(directiveLine, " \t\r"), ".data") {
 			// directive
-			//textSection = strings.HasPrefix(strings.TrimLeft(directiveLine, " \t\r"), ".text") bad change 3
+			textSection = strings.HasPrefix(strings.TrimLeft(directiveLine, " \t\r"), ".text")
 		} else if textSection {
 			// instruction
 
