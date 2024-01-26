@@ -364,7 +364,14 @@ func initDebugger(assemblyPath string, assignmentPath string, seq int, randomSee
 	assemblyGlobalPointer := uint32(0)
 
 	assembleRes := assembler.Assemble(string(b))
-	if len(assembleRes.Diagnostics) > 0 {
+	numErrors := 0
+	for _, diag := range assembleRes.Diagnostics {
+		if diag.Severity == assembler.Error {
+			numErrors++
+		}
+	}
+
+	if numErrors > 0 {
 		builder := strings.Builder{}
 		builder.WriteByte('\n')
 		for _, diag := range assembleRes.Diagnostics {
@@ -706,7 +713,7 @@ func handleGetVariables(data json.RawMessage, seq int) {
 			variables[i] = Variable{
 				Name:               fmt.Sprintf("x%d (%s)", v, friendlyName),
 				EvaluateName:       fmt.Sprintf("x%d", v),
-				Value:              fmt.Sprintf("%d (0x%X)", liveEmulator.registers[v], liveEmulator.registers[v]),
+				Value:              fmt.Sprintf("%d (0x%X)", int32(liveEmulator.registers[v]), liveEmulator.registers[v]),
 				VariablesReference: v,
 				Type:               "int32_t",
 				PresentationHint: VariablePresentationHint{
@@ -722,7 +729,7 @@ func handleGetVariables(data json.RawMessage, seq int) {
 
 		variables = []Variable{{
 			Name:  "Value",
-			Value: fmt.Sprintf("%d", regVal),
+			Value: fmt.Sprintf("%d", int32(regVal)),
 			Type:  "int32_t",
 			PresentationHint: VariablePresentationHint{
 				Kind: "data",

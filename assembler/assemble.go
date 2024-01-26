@@ -310,15 +310,12 @@ func (a *AssembledResult) parseITypeInstruction(line string, diff, lineNum int, 
 	case "xori":
 		deOp = 0b0010011
 		func3 = 0b100
-		unsigned = true
 	case "ori":
 		deOp = 0b0010011
 		func3 = 0b110
-		unsigned = true
 	case "andi":
 		deOp = 0b0010011
 		func3 = 0b111
-		unsigned = true
 	case "slli":
 		deOp = 0b0010011
 		func3 = 0b001

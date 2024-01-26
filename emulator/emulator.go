@@ -461,9 +461,21 @@ func (inst *EmulatorInstance) executeRType(instruction uint32) {
 				inst.regWrite(rd, uint32(int64(int64(inst.regRead(rs1))*int64(inst.regRead(rs2))>>32)))
 			case 0b100:
 				// DIV
+				// testing for divide by zero
+				if inst.regRead(rs2) == 0 {
+					inst.newException("divide by zero")
+					return
+				}
+
 				inst.regWrite(rd, uint32(int32(inst.regRead(rs1))/int32(inst.regRead(rs2))))
 			case 0b101:
 				// DIVU
+				// testing for divide by zero
+				if inst.regRead(rs2) == 0 {
+					inst.newException("divide by zero")
+					return
+				}
+
 				inst.regWrite(rd, inst.regRead(rs1)/inst.regRead(rs2))
 			case 0b110:
 				// REM
