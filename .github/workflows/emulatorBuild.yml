@@ -3,11 +3,7 @@
 
 name: Build Emulator
 
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+on: workflow_dispatch
 
 jobs:
 
@@ -92,19 +88,17 @@ jobs:
           build/riscvemulator-macos-arm64
           version.txt
 
-    - name: Upload Binaries to S3
-      uses: shallwefootball/s3-upload-action@master
-      with:
-        aws_bucket: ${{ secrets.S3_BUCKET }}
-        source_dir: build
-        aws_key_id: ${{ secrets.S3_ACCESS_KEY }}
-        aws_secret_access_key: ${{ secrets.S3_SECRET_KEY }}
+    - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.S3_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.S3_SECRET_KEY }}
+          aws-region: us-east-2
 
-    - name: Update Version
-      uses: shallwefootball/s3-upload-action@master
-      with:
-        aws_bucket: ${{ secrets.S3_BUCKET }}
-        source_dir: version.txt
-        aws_key_id: ${{ secrets.S3_ACCESS_KEY }}
-        aws_secret_access_key: ${{ secrets.S3_SECRET_KEY }}
+    - name: Copy Version File to build
+      run: cp version.txt build/
+
+    - name: Deploy to S3
+      run: |
+        aws s3 sync build s3://${{ secrets.S3_BUCKET }}/ --delete
 
