@@ -12,6 +12,14 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Check that version has changed
+      run: |
+        wget https://ece2035vscode.s3.us-east-2.amazonaws.com/version.txt -o existingVersion.txt
+        if [ -z "$(git diff existingVersion.txt version.txt)" ]; then
+          echo "Version has not changed, exiting"
+          exit 1
+        fi
+
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
