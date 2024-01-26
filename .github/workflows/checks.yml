@@ -1,8 +1,8 @@
 name: Go Status Check
-on: [push]
+on: [pull_request]
 
 jobs:
-  build:
+  gocheckuts:
     runs-on: ubuntu-latest
 
     steps:
