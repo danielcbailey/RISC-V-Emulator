@@ -1,4 +1,4 @@
-name: Go
+name: Go Status Check
 on: [push]
 
 jobs:
