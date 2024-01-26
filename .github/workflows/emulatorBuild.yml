@@ -14,7 +14,7 @@ jobs:
 
     - name: Check that version has changed
       run: |
-        wget https://ece2035vscode.s3.us-east-2.amazonaws.com/version.txt -o existingVersion.txt
+        wget https://${{ secrets.S3_BUCKET }}.s3.us-east-2.amazonaws.com/version.txt -o existingVersion.txt
         if [ -z "$(git diff existingVersion.txt version.txt)" ]; then
           echo "Version has not changed, exiting"
           exit 1
