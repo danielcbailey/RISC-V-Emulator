@@ -38,7 +38,7 @@ type CapabilitiesResponse struct {
 
 type Request struct {
 	Seq       int             `json:"seq"`
-	Type      string          `json:"type"`
+	Type      string          `json:"type"`dfghkjdsfgjhdsfghjk
 	Command   string          `json:"command"`
 	Arguments json.RawMessage `json:"arguments"`
 }
