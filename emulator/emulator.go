@@ -239,9 +239,11 @@ func (inst *EmulatorInstance) executeJAL(instruction uint32) {
 	_, rd, imm := assembler.DecodeJTypeInstruction(instruction)
 
 	// setting the return address
-	inst.regWrite(rd, inst.pc+4)
-	if rd == 1 {
-		inst.callStack = append(inst.callStack, inst.pc)
+	if rd != 0 {
+		inst.regWrite(rd, inst.pc+4)
+		if rd == 1 {
+			inst.callStack = append(inst.callStack, inst.pc)
+		}
 	}
 
 	// jumping to the new address
