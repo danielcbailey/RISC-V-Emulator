@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.gatech.edu/ECEInnovation/RISC-V-Emulator/assembler"
 	"github.gatech.edu/ECEInnovation/RISC-V-Emulator/autograder"
@@ -49,6 +51,17 @@ func main() {
 	} else if len(os.Args) == 1 {
 		// run as language server but in tcp mode so it can be remotely debugged
 		languageServer.ListenAndServeTCP()
+	} else if len(os.Args) == 5 && os.Args[1] == "runBatch" {
+		asmFilePath := os.Args[2]
+		elfFilePath := os.Args[3]
+		seeds := strings.Split(os.Args[4], ",")
+		seedInts := []uint32{}
+		for _, s := range seeds {
+			v, _ := strconv.ParseUint(s, 10, 32)
+			seedInts = append(seedInts, uint32(v))
+		}
+
+		emulator.BatchRun(elfFilePath, asmFilePath, seedInts, true)
 	} else {
 		log.Fatalln("Invalid arguments:", os.Args)
 	}

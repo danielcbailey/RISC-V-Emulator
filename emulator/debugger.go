@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -15,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.gatech.edu/ECEInnovation/RISC-V-Emulator/assembler"
 )
 
@@ -64,7 +62,6 @@ var assembledFilePath string
 var continueChan chan bool
 var assemblyEntry uint32 = 0
 var stdOutBuilder strings.Builder
-var sendLastScreen func()
 
 func RunDebugServer() {
 	defer func() {
@@ -75,7 +72,6 @@ func RunDebugServer() {
 	}()
 
 	// uses stdin and out
-	go listenForWebsockets()
 
 	contentLength := 0
 	reader := bufio.NewReader(os.Stdin)
@@ -106,33 +102,6 @@ func RunDebugServer() {
 			command := decodedData.Command
 			dispatchCommand(command, decodedData.Arguments, decodedData.Seq)
 		}
-	}
-}
-
-func listenForWebsockets() {
-	// hosts a websocket listener on port 2035
-	// this is used to send updates to the client
-	var upgrader = websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-	}
-
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		upgrader.CheckOrigin = func(r *http.Request) bool { return true }
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		serveScreenWebsocket(conn)
-	}
-
-	http.HandleFunc("/ws", handler)
-	err := http.ListenAndServe("localhost:2035", nil)
-	if err != nil {
-		sendOutput("FATAL: There is another RISC-V debug session running on your computer. Please terminate it and try again.", true)
-		os.Exit(1)
 	}
 }
 
@@ -478,10 +447,11 @@ func handleConfigDone(data json.RawMessage, seq int) {
 		emulator := liveEmulator
 		emulator.Emulate(assemblyEntry) // pc will be set by the launch code above
 
-		if sendLastScreen != nil {
-			sendLastScreen()
-		}
-		time.Sleep(1 * time.Second)
+		// sending seed
+		sendEvent("riscv_context", map[string]interface{}{
+			"seed": emulator.randomSeed,
+		})
+		sendScreenUpdates()
 
 		if emulator.terminated {
 			return
@@ -558,6 +528,10 @@ func handleContinue(seq int) {
 var stackFrameIDCounter = 0
 
 func handleGetStacktrace(data json.RawMessage, seq int) {
+	// called whenever the debugger stops
+	// so can send over misc. updates
+	sendScreenUpdates()
+
 	trace := liveEmulator.callStack
 
 	// building the stack frames
@@ -876,69 +850,35 @@ func sendToClient(data interface{}) {
 	fmt.Print("Content-Length: " + strconv.Itoa(len(b)) + "\r\n\r\n" + string(b))
 }
 
-func serveScreenWebsocket(conn *websocket.Conn) {
+func sendScreenUpdates() {
+	statusString := "running"
+	if liveEmulator.solutionValidity == 1 {
+		statusString = "failed"
+	} else if liveEmulator.solutionValidity == 2 {
+		statusString = "passed"
+	}
+
 	type ScreenUpdate struct {
 		Width   int                    `json:"width"`
 		Height  int                    `json:"height"`
 		Updates []VirtualDisplayUpdate `json:"updates"`
+		Status  string                 `json:"status"`
+		Stats   map[string]int         `json:"stats"`
 	}
 
-	sendLastScreen = func() {
-		packet := ScreenUpdate{
-			Width:   liveEmulator.display.width,
-			Height:  liveEmulator.display.height,
-			Updates: liveEmulator.display.GetEntireScreen(),
-		}
-
-		b, _ := json.Marshal(packet)
-		conn.WriteMessage(websocket.TextMessage, b)
-	}
-
-	// sending entire screen
 	packet := ScreenUpdate{
 		Width:   liveEmulator.display.width,
 		Height:  liveEmulator.display.height,
 		Updates: liveEmulator.display.GetEntireScreen(),
+		Status:  statusString,
+		Stats: map[string]int{
+			"di":  int(liveEmulator.di),
+			"mem": int(liveEmulator.memUsage),
+			"reg": int(liveEmulator.regUsage),
+			"si":  len(liveAssembledResult.ProgramText),
+		},
 	}
 
-	lastScreenWidth := packet.Width
-	lastScreenHeight := packet.Height
-
-	b, _ := json.Marshal(packet)
-	conn.WriteMessage(websocket.TextMessage, b)
-
-	// wait for the client to acknowledge the update
-	_, _, err := conn.ReadMessage()
-	if err != nil {
-		return
-	}
-
-	for true {
-		time.Sleep(100 * time.Millisecond)
-		if liveEmulator == nil || liveEmulator.terminated {
-			continue
-		}
-
-		packet := ScreenUpdate{
-			Width:   liveEmulator.display.width,
-			Height:  liveEmulator.display.height,
-			Updates: liveEmulator.display.GetUpdates(),
-		}
-
-		if len(packet.Updates) == 0 || packet.Width != lastScreenWidth || packet.Height != lastScreenHeight {
-			continue
-		}
-
-		lastScreenWidth = packet.Width
-		lastScreenHeight = packet.Height
-
-		b, _ := json.Marshal(packet)
-		conn.WriteMessage(websocket.TextMessage, b)
-
-		// wait for the client to acknowledge the update
-		_, _, err := conn.ReadMessage()
-		if err != nil {
-			return
-		}
-	}
+	sendEvent("riscv_screen", packet)
+	sendOutput("sent screen update!", true)
 }

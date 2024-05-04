@@ -110,6 +110,17 @@ func (m *MemoryImage) ReadHalfWord(addr uint32) (uint16, bool) {
 	return uint16((page.Block[(addr&0xFFF)>>2] >> ((addr & 0x3) * 8)) & 0xFFFF), page.Initialized[(addr&0xFFF)>>2]
 }
 
+func (m *MemoryImage) Clone() *MemoryImage {
+	newMem := NewMemoryImage()
+	for k, v := range m.Blocks {
+		newPage := &MemoryPage{Block: [1024]uint32{}, Initialized: [1024]bool{}, StartAddr: v.StartAddr}
+		copy(newPage.Block[:], v.Block[:])
+		copy(newPage.Initialized[:], v.Initialized[:])
+		newMem.Blocks[k] = newPage
+	}
+	return newMem
+}
+
 func (inst *EmulatorInstance) GetExitCode() int {
 	return inst.exitCode
 }
