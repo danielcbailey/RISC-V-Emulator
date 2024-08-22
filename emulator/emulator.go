@@ -62,7 +62,6 @@ func (inst *EmulatorInstance) Emulate(startAddr uint32) {
 
 	// setting the program counter
 	inst.pc = startAddr - 4
-
 	// setting i and d cache to first valid block
 	for _, block := range inst.memory.Blocks {
 		if block != nil {
