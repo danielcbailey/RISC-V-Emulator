@@ -457,7 +457,7 @@ func handleConfigDone(data json.RawMessage, seq int) {
 			return
 		}
 
-		sendOutput(fmt.Sprintf("Emulation Completed.\nDI = %d, Memory Usage = %d, Register Usage = %d", emulator.di, int(emulator.memUsage)+len(liveAssembledResult.ProgramData), emulator.regUsage), true)
+		sendOutput(fmt.Sprintf("Emulation Completed.\nDI = %d, SI=%d, Register Usage = %d, Memory Usage = %d", emulator.di, len(liveAssembledResult.ProgramText), emulator.regUsage, int(emulator.memUsage)+len(liveAssembledResult.ProgramData)), true)
 		sendEvent("exited", ExitEventBody{
 			ExitCode: 0,
 		})
@@ -658,6 +658,7 @@ func handleGetVariables(data json.RawMessage, seq int) {
 		// converting the regsMap to a slice of register numbers sorted from least to greatest
 		regs := make([]int, len(regsMap))
 		i := 0
+		//sendOutput("number used registers: "+strconv.Itoa(len(regsMap))+"\n", true)
 		for k := range regsMap {
 			regs[i] = k
 			i++
@@ -873,7 +874,7 @@ func sendScreenUpdates() {
 		Status:  statusString,
 		Stats: map[string]int{
 			"di":  int(liveEmulator.di),
-			"mem": int(liveEmulator.memUsage),
+			"mem": int(liveEmulator.memUsage)+len(liveAssembledResult.ProgramData),
 			"reg": int(liveEmulator.regUsage),
 			"si":  len(liveAssembledResult.ProgramText),
 		},
