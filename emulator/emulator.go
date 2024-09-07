@@ -62,7 +62,6 @@ func (inst *EmulatorInstance) Emulate(startAddr uint32) {
 
 	// setting the program counter
 	inst.pc = startAddr - 4
-
 	// setting i and d cache to first valid block
 	for _, block := range inst.memory.Blocks {
 		if block != nil {
@@ -323,7 +322,6 @@ func (inst *EmulatorInstance) executeMemIType(instruction uint32) {
 	_, rd, rs1, imm, func3 := assembler.DecodeITypeInstruction(instruction)
 
 	immInt := int32(imm<<20) >> 20
-
 	// since this is the mem I-type, the opcode should be the same for all, thus only func3 needs to be checked
 	switch func3 {
 	case 0b000:
