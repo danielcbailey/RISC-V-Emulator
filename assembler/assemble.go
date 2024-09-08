@@ -523,7 +523,7 @@ func (a *AssembledResult) parseITypeMemInstruction(line string, diff, lineNum in
 	func3 := uint32(0)
 	switch opcode {
 	case "lb":
-		deOp = 0b0100011
+		deOp = 0b0000011
 		func3 = 0b000
 	case "lh":
 		deOp = 0b0000011
