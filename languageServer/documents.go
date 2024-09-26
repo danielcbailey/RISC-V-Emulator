@@ -121,7 +121,7 @@ func reformatDocument(uri DocumentUri) string {
 		withoutComment := strings.Split(line, "#")[0]
 		withComment := ""
 		if strings.Contains(line, "#") {
-			withComment = "#" + strings.Split(line, "#")[1]
+			withComment = "#" + strings.SplitN(line, "#", 2)[1]
 		}
 		lineWithoutWhitespace := strings.TrimLeft(withoutComment, " \t")
 		lineWithoutWhitespace = strings.ReplaceAll(lineWithoutWhitespace, "\t", " ")
