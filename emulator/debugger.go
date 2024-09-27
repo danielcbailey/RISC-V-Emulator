@@ -881,5 +881,5 @@ func sendScreenUpdates() {
 	}
 
 	sendEvent("riscv_screen", packet)
-	sendOutput("sent screen update!", true)
+	//sendOutput("sent screen update!", true)
 }

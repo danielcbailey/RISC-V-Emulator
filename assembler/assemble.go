@@ -80,7 +80,7 @@ func (a *AssembledResult) Evaluate(str string) (EvaluationResult, error) {
 		return EvaluationResult{}, err
 	}
 
-	if value > 0 {
+	if value >= 0 {
 		return EvaluationResult{Value: value, Type: EvaluationTypeUnsignedIntegerLiteral, MatchedValue: str}, nil
 	}
 
