@@ -99,6 +99,16 @@ func (assemblyError) ImmediateOverflow(value string, maxSize int, r TextRange) D
 	r, value = AdjustRange(r, value)
 	return Diagnostic{
 		Range:    r,
+		Message:  "Immediate value \"" + value + "\" is out of range of " + strconv.Itoa(maxSize) + " bits [-" + strconv.Itoa(int(math.Pow(2, float64(maxSize-1)))) + ", " + strconv.Itoa(int(math.Pow(2, float64(maxSize-1)))) + ")",
+		Source:   "Assembler",
+		Severity: Error,
+	}
+}
+
+func (assemblyError) UnsignedImmediateOverflow(value string, maxSize int, r TextRange) Diagnostic {
+	r, value = AdjustRange(r, value)
+	return Diagnostic{
+		Range:    r,
 		Message:  "Immediate value \"" + value + "\" is too large. Must be less than " + strconv.Itoa(maxSize) + " bits (" + strconv.Itoa(int(math.Pow(2, float64(maxSize)))) + ")",
 		Source:   "Assembler",
 		Severity: Error,

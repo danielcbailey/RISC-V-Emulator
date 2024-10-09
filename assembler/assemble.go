@@ -383,6 +383,9 @@ func (a *AssembledResult) parseITypeInstruction(line string, diff, lineNum int, 
 	}
 
 	// checking for immediate overflow
+	if !unsigned && op2.Type == EvaluationTypeUnsignedIntegerLiteral {
+		op2.Type = EvaluationTypeIntegerLiteral
+	}
 	if op2.Type == EvaluationTypeIntegerLiteral || op2.Type == EvaluationTypeLabel {
 		// maximum of 12 bits
 		if op2.Value > 2047 || op2.Value < -2048 {
@@ -396,7 +399,7 @@ func (a *AssembledResult) parseITypeInstruction(line string, diff, lineNum int, 
 		// maximum of 12 bits
 		if op2.Value > 4095 {
 			offset := diff + len(opcode) + 1 + len(operand1) + 1 + len(parts[1]) + 1
-			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[2], 12, TextRange{
+			a.Diagnostics = append(a.Diagnostics, Errors.UnsignedImmediateOverflow(parts[2], 12, TextRange{
 				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[2])},
 			}))
 			return 0, false
@@ -490,6 +493,7 @@ func (a *AssembledResult) parseITypeMemInstruction(line string, diff, lineNum in
 	}
 
 	// check if immediate is in range
+	/*
 	if op2.Type == EvaluationTypeUnsignedIntegerLiteral {
 		// maximum of 12 bits
 		if op2.Value > 4095 {
@@ -499,7 +503,8 @@ func (a *AssembledResult) parseITypeMemInstruction(line string, diff, lineNum in
 			}))
 			return 0, false
 		}
-	} else if op2.Type == EvaluationTypeIntegerLiteral || op2.Type == EvaluationTypeLabel {
+	} else */
+	if op2.Type == EvaluationTypeIntegerLiteral || op2.Type == EvaluationTypeLabel || op2.Type == EvaluationTypeUnsignedIntegerLiteral {
 		// maximum of 12 bits
 		if op2.Value < -2048 || op2.Value > 2047 {
 			offset := diff + len(parts[0]) + 1
@@ -607,6 +612,7 @@ func (a *AssembledResult) parseSTypeInstruction(line string, diff int, lineNum i
 	}
 
 	// check if immediate is in range
+	/*
 	if op2.Type == EvaluationTypeUnsignedIntegerLiteral {
 		// maximum of 12 bits
 		if op2.Value > 4095 {
@@ -616,7 +622,8 @@ func (a *AssembledResult) parseSTypeInstruction(line string, diff int, lineNum i
 			}))
 			return 0, false
 		}
-	} else if op2.Type == EvaluationTypeIntegerLiteral || op2.Type == EvaluationTypeLabel {
+	} else */
+	if op2.Type == EvaluationTypeIntegerLiteral || op2.Type == EvaluationTypeLabel || op2.Type == EvaluationTypeUnsignedIntegerLiteral {
 		// maximum of 12 bits
 		if op2.Value < -2048 || op2.Value > 2047 {
 			offset := diff + len(parts[0]) + 1
@@ -698,21 +705,23 @@ func (a *AssembledResult) parseBTypeInstruction(line string, diff, lineNum int, 
 	}
 
 	// check if immediate is in range
-	if op2.Type == EvaluationTypeUnsignedIntegerLiteral {
+	/*
+	if op3.Type == EvaluationTypeUnsignedIntegerLiteral {
 		// maximum of 13 bits
-		if op2.Value > 8191 {
-			offset := len(parts[0]) + 1 + diff
-			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[1], 13, TextRange{
-				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[1])},
+		if op3.Value > 2047 {  
+			offset := len(parts[0]) + 1 + diff + len(parts[1]) + 1
+			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[2], 12, TextRange{
+				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[2])},
 			}))
 			return 0, false
 		}
-	} else if op2.Type == EvaluationTypeIntegerLiteral || op2.Type == EvaluationTypeLabel {
+	} else */
+	if op3.Type == EvaluationTypeIntegerLiteral || op3.Type == EvaluationTypeLabel || op3.Type == EvaluationTypeUnsignedIntegerLiteral {
 		// maximum of 13 bits
-		if op2.Value < -4096 || op2.Value > 4095 {
-			offset := len(parts[0]) + 1 + diff
-			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[1], 13, TextRange{
-				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[1])},
+		if op3.Value < -4096 || op3.Value > 4095 {
+			offset := len(parts[0]) + 1 + diff + len(parts[1]) + 1
+			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[2], 13, TextRange{
+				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[2])},
 			}))
 			return 0, false
 		}
@@ -879,7 +888,7 @@ func (a *AssembledResult) parseUTypeInstruction(line string, diff, lineNum int, 
 		// maximum of 32 bits
 		if op2.Value > 0xFFFFFFFF {
 			offset := diff + len(parts[0]) + 1
-			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[1], 20, TextRange{
+			a.Diagnostics = append(a.Diagnostics, Errors.UnsignedImmediateOverflow(parts[1], 20, TextRange{
 				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[1])},
 			}))
 			return 0, false
@@ -962,8 +971,8 @@ func (a *AssembledResult) resolveLabelLinkRequests() {
 			imm := uint32(0)
 			if request.isBranch || a.LabelTypes[request.labelName] == "text" {
 				// if is branch, the label should be relative to the instruction address
-				immInt := int32(labelAddr - currAddr)
-				if immInt > 0x7FF || immInt < -0x800 {
+				immInt := int32((labelAddr - currAddr))
+				if immInt > 4095 || immInt < -4096 {
 					lineNum := a.AddressToLine[address]
 					charPos := strings.Index(a.fileContents[lineNum], request.labelName)
 					a.Diagnostics = append(a.Diagnostics, Errors.LabelTooFar(request.labelName, TextRange{
@@ -981,8 +990,8 @@ func (a *AssembledResult) resolveLabelLinkRequests() {
 			// J type
 			opcode, rd, _ := DecodeJTypeInstruction(instruction)
 			// the label should be treated as relative to the instruction address
-			immInt := int32(labelAddr - currAddr)
-			if immInt > 0x7FFFF || immInt < -0x80000 {
+			immInt := int32((labelAddr - currAddr))
+			if immInt > 0xFFFFF || immInt < -0x100000 { // +/- 1M
 				lineNum := a.AddressToLine[address]
 				charPos := strings.Index(a.fileContents[lineNum], request.labelName)
 				a.Diagnostics = append(a.Diagnostics, Errors.LabelTooFar(request.labelName, TextRange{
@@ -1002,8 +1011,8 @@ func (a *AssembledResult) resolveLabelLinkRequests() {
 			// B type
 			opcode, rs1, rs2, _, func3 := DecodeBTypeInstruction(instruction)
 			// the label should be treated as relative to the instruction address
-			immInt := int32(labelAddr - currAddr)
-			if immInt > 0x7FF || immInt < -0x800 {
+			immInt := int32((labelAddr - currAddr))
+			if immInt > 4095 || immInt < -4096 {
 				lineNum := a.AddressToLine[address]
 				charPos := strings.Index(a.fileContents[lineNum], request.labelName)
 				a.Diagnostics = append(a.Diagnostics, Errors.LabelTooFar(request.labelName, TextRange{
