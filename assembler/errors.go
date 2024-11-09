@@ -237,6 +237,14 @@ func (e *EvaluationInvalidNumberLiteral) Error() string {
 	return "Invalid number literal: " + e.expression
 }
 
+type EvaluationImmOverflow struct {
+	expression string
+}
+
+func (e *EvaluationImmOverflow) Error() string {
+	return "Immediate Overflow: " + e.expression
+}
+
 type EvaluationInvalidExpression struct {
 	expression string
 }
@@ -257,6 +265,10 @@ func (evaluationErrors) InvalidNumberLiteral(expression string) *EvaluationInval
 	return &EvaluationInvalidNumberLiteral{expression: expression}
 }
 
+func (evaluationErrors) ImmOverflow(expression string) *EvaluationImmOverflow {
+	return &EvaluationImmOverflow{expression: expression}
+}
+
 func (evaluationErrors) IsUnresolvedSymbolError(err error) bool {
 	_, ok := err.(*EvaluationUnresolvedSymbol)
 	return ok
@@ -269,5 +281,10 @@ func (evaluationErrors) IsInvalidNumberLiteralError(err error) bool {
 
 func (evaluationErrors) IsInvalidExpressionError(err error) bool {
 	_, ok := err.(*EvaluationInvalidExpression)
+	return ok
+}
+
+func (evaluationErrors) IsImmOverflowError(err error) bool {
+	_, ok := err.(*EvaluationImmOverflow)
 	return ok
 }
