@@ -543,7 +543,7 @@ func (a *AssembledResult) parseITypeMemInstruction(line string, diff, lineNum in
 		// maximum of 12 bits
 		if op2.Value < -2048 || op2.Value > 2047 {
 			offset := diff + len(parts[0]) + 1
-			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[1], 12, TextRange{
+			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(operand2, 12, TextRange{
 				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(operand2)},
 			}))
 			return 0, false
@@ -662,7 +662,7 @@ func (a *AssembledResult) parseSTypeInstruction(line string, diff int, lineNum i
 		// maximum of 12 bits
 		if op2.Value < -2048 || op2.Value > 2047 {
 			offset := diff + len(parts[0]) + 1
-			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[1], 12, TextRange{
+			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(operand2, 12, TextRange{
 				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(operand2)},
 			}))
 			return 0, false
