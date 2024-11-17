@@ -359,6 +359,7 @@ func (a *AssembledResult) parseITypeInstruction(line string, diff, lineNum int, 
 		deOp = 0b0010011
 		func3 = 0b101
 		isSRA = true
+		unsigned = true
 	case "slti":
 		deOp = 0b0010011
 		func3 = 0b010
