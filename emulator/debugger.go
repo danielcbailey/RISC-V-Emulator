@@ -874,12 +874,13 @@ func sendScreenUpdates() {
 		Status:  statusString,
 		Stats: map[string]int{
 			"di":  int(liveEmulator.di),
-			"mem": int(liveEmulator.memUsage)+len(liveAssembledResult.ProgramData),
+			"mem": int(liveEmulator.memUsage) + len(liveAssembledResult.ProgramData),
 			"reg": int(liveEmulator.regUsage),
 			"si":  len(liveAssembledResult.ProgramText),
 		},
 	}
 
 	sendEvent("riscv_screen", packet)
+	sendOutput(fmt.Sprintf("PC: %d", int(liveEmulator.pc)), true)
 	//sendOutput("sent screen update!", true)
 }

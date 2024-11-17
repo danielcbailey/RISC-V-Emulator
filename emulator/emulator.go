@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.gatech.edu/ECEInnovation/RISC-V-Emulator/assembler"
+	"fmt"
 )
 
 func (inst *EmulatorInstance) regRead(reg uint32) uint32 {
@@ -179,6 +180,9 @@ func (inst *EmulatorInstance) Emulate(startAddr uint32) {
 		}
 
 		inst.executedInstructions++
+	}
+	if (inst.di >= inst.runtimeLimit){
+		sendOutput(fmt.Sprintf("***Infinite Loop? DI: %d***", inst.di), true)
 	}
 }
 
