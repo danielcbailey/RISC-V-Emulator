@@ -857,8 +857,11 @@ func sendScreenUpdates() {
 		statusString = "failed"
 	} else if liveEmulator.solutionValidity == 2 {
 		statusString = "passed"
-	}
-
+	} else if liveEmulator.pc == 0x20352035 || liveEmulator.pc == 0x20352034 {
+		// magic number to end the emulator
+		statusString = "finished"
+	} 
+	
 	type ScreenUpdate struct {
 		Width   int                    `json:"width"`
 		Height  int                    `json:"height"`
@@ -877,10 +880,11 @@ func sendScreenUpdates() {
 			"mem": int(liveEmulator.memUsage) + len(liveAssembledResult.ProgramData),
 			"reg": int(liveEmulator.regUsage),
 			"si":  len(liveAssembledResult.ProgramText),
+			"pc":  int(liveEmulator.pc),
 		},
 	}
 
 	sendEvent("riscv_screen", packet)
-	sendOutput(fmt.Sprintf("PC: %d", int(liveEmulator.pc)), true)
+	//sendOutput(fmt.Sprintf("PC: %d", int(liveEmulator.pc)), true)
 	//sendOutput("sent screen update!", true)
 }
