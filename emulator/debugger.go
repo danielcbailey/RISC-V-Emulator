@@ -510,12 +510,16 @@ func handleStepIn(seq int) {
 }
 
 func handleStepOut(seq int) {
-	// get line of last callstack frame
-	liveEmulator.breakAddr = liveEmulator.callStack[len(liveEmulator.callStack)-1] + 4
-	if continueChan != nil {
-		continueChan <- true
+	if (len(liveEmulator.callStack) < 1) {
+		sendOutput("Not currently in a function call; cannot Step Out.", true)
+	} else {
+		// get line of last callstack frame
+		liveEmulator.breakAddr = liveEmulator.callStack[len(liveEmulator.callStack)-1] + 4
+		if continueChan != nil {
+			continueChan <- true
+		}
+		sendResponse("stepOut", seq, true, EmptyResponse{})
 	}
-	sendResponse("stepOut", seq, true, EmptyResponse{})
 }
 
 func handleContinue(seq int) {

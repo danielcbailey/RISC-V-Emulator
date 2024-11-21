@@ -111,7 +111,7 @@ func evalWorker(memImg memoryImageContext, seedQueue chan uint32, stdOutMutex *s
 			StdOutCallback: func(b byte) {
 				// nothing..
 			},
-			RuntimeLimit: 1000000, // 100,000 instructions, which doesn't include the CPP code
+			RuntimeLimit: 100000, // 100,000 instructions, which doesn't include the CPP code
 		}
 
 		emulator := NewEmulator(config)
