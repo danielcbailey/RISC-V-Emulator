@@ -82,7 +82,8 @@ func (inst *EmulatorInstance) Emulate(startAddr uint32) {
 	for inst.di < inst.runtimeLimit && !inst.terminated {
 		inst.pc += 4
 		if inst.pc == 0x20352035 || inst.pc == 0x20352034 {
-			// magic number to end the emulator
+			// end the emulator when magic number is reached (0x20352035 is the return address
+			// of the main program)
 			break
 		} else if inst.pc == 0x20352037 {
 			// magic number to resume from an interrupt
