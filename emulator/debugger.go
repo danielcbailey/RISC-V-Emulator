@@ -2,7 +2,10 @@ package emulator
 
 import (
 	"bufio"
+	"bytes"
 	"debug/elf"
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -133,6 +136,8 @@ func dispatchCommand(command string, data json.RawMessage, seq int) {
 		handleGetScopes(data, seq)
 	case "variables":
 		handleGetVariables(data, seq)
+	case "readMemory":
+		handleReadMemory(data, seq)
 	case "restart":
 		handleRestart(data, seq)
 	case "dataBreakpointInfo":
@@ -634,6 +639,10 @@ func handleGetScopes(data json.RawMessage, seq int) {
 		Name:               "registers",
 		PresentationHint:   "registers",
 		VariablesReference: 32,
+	}, {
+		Name:               "memory",
+		PresentationHint:   "memory",
+		VariablesReference: 500,
 	}}
 
 	scopesResponse := struct {
@@ -641,6 +650,59 @@ func handleGetScopes(data json.RawMessage, seq int) {
 	}{Scopes: scopes}
 
 	sendResponse("scopes", seq, true, scopesResponse)
+}
+
+
+func handleReadMemory(data json.RawMessage, seq int) {	
+	request := struct {
+		MemoryReference string    `json:"memoryReference"` // memory reference to base location to read data
+		Offset               int `json:"offset"` // offset in bytes to memory reference
+		Count               int `json:"count"` // number of bytes to read at given location
+	}{}
+	json.Unmarshal(data, &request)
+
+	response := struct {
+		Address      string `json:"address"` // address of first byte
+		UnreadableBytes string `json:"unreadableBytes"` // unreadable bytes after last successfully read byte
+		Data string `json:"data"` // resulting bytes encoded in base64
+	}{}
+
+	// ignoring edge cases for now
+	response.Address = "0"
+	response.UnreadableBytes = ""
+	response.Data = ""
+
+	blockVal, ok := liveEmulator.memory.Blocks[uint32(request.Offset >> 12)]
+	
+	// Pages are lazily loaded, so unless a stack operation has occurred we can't guarantee the memory exists
+	if !ok {
+		sendResponse("readMemory", seq, true, response);
+		return
+	}
+
+	block := blockVal.Block
+
+	buf := new(bytes.Buffer)
+
+	start := (request.Offset & 0xFFF) >> 2
+	end := (start + request.Count) 
+
+	if end >= len(block) {
+		end = len(block) - 1
+	}
+
+	// encode block into base64
+	for i := start; i <= end; i++ {
+		binary.Write(buf, binary.BigEndian, block[i])	
+	}
+
+	bufBytes := buf.Bytes()
+
+	base64Encoded := base64.StdEncoding.EncodeToString(bufBytes)
+
+	response.Data =  base64Encoded
+
+	sendResponse("readMemory", seq, true, response)
 }
 
 func handleGetVariables(data json.RawMessage, seq int) {
