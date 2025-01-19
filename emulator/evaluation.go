@@ -40,6 +40,7 @@ type memoryImageContext struct {
 	osGlobalPointer           uint32
 	osEntry                   uint32
 	asmStaticInstructionCount int
+	asmStaticMemoryCount      int
 }
 
 func BatchRun(elfFilePath, asmFilePath string, seeds []uint32, streamToStdout bool) ([]EvaluationRunResult, error) {
@@ -131,7 +132,7 @@ func evalWorker(memImg memoryImageContext, seedQueue chan uint32, stdOutMutex *s
 			DI:        int(emulator.di),
 			SI:        memImg.asmStaticInstructionCount,
 			Regs:      int(emulator.regUsage),
-			Mem:       int(emulator.memUsage),
+			Mem:       int(emulator.memUsage) + memImg.asmStaticMemoryCount,
 			NumErrors: numErrors,
 		}
 
@@ -260,5 +261,6 @@ func buildMemoryImage(elfFilePath, asmFilePath string) (memoryImageContext, erro
 		osGlobalPointer:           globalPointer,
 		asmGlobalPointer:          assemblyGlobalPointer,
 		asmStaticInstructionCount: len(assembleRes.ProgramText),
+		asmStaticMemoryCount:      len(assembleRes.ProgramData),
 	}, nil
 }

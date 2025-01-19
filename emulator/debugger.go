@@ -652,19 +652,18 @@ func handleGetScopes(data json.RawMessage, seq int) {
 	sendResponse("scopes", seq, true, scopesResponse)
 }
 
-
-func handleReadMemory(data json.RawMessage, seq int) {	
+func handleReadMemory(data json.RawMessage, seq int) {
 	request := struct {
-		MemoryReference string    `json:"memoryReference"` // memory reference to base location to read data
-		Offset               int `json:"offset"` // offset in bytes to memory reference
-		Count               int `json:"count"` // number of bytes to read at given location
+		MemoryReference string `json:"memoryReference"` // memory reference to base location to read data
+		Offset          int    `json:"offset"`          // offset in bytes to memory reference
+		Count           int    `json:"count"`           // number of bytes to read at given location
 	}{}
 	json.Unmarshal(data, &request)
 
 	response := struct {
-		Address      string `json:"address"` // address of first byte
+		Address         string `json:"address"`         // address of first byte
 		UnreadableBytes string `json:"unreadableBytes"` // unreadable bytes after last successfully read byte
-		Data string `json:"data"` // resulting bytes encoded in base64
+		Data            string `json:"data"`            // resulting bytes encoded in base64
 	}{}
 
 	// ignoring edge cases for now
@@ -672,11 +671,11 @@ func handleReadMemory(data json.RawMessage, seq int) {
 	response.UnreadableBytes = ""
 	response.Data = ""
 
-	blockVal, ok := liveEmulator.memory.Blocks[uint32(request.Offset >> 12)]
-	
+	blockVal, ok := liveEmulator.memory.Blocks[uint32(request.Offset>>12)]
+
 	// Pages are lazily loaded, so unless a stack operation has occurred we can't guarantee the memory exists
 	if !ok {
-		sendResponse("readMemory", seq, true, response);
+		sendResponse("readMemory", seq, true, response)
 		return
 	}
 
@@ -685,7 +684,7 @@ func handleReadMemory(data json.RawMessage, seq int) {
 	buf := new(bytes.Buffer)
 
 	start := (request.Offset & 0xFFF) >> 2
-	end := (start + request.Count) 
+	end := (start + request.Count)
 
 	if end >= len(block) {
 		end = len(block) - 1
@@ -693,14 +692,14 @@ func handleReadMemory(data json.RawMessage, seq int) {
 
 	// encode block into base64
 	for i := start; i <= end; i++ {
-		binary.Write(buf, binary.BigEndian, block[i])	
+		binary.Write(buf, binary.BigEndian, block[i])
 	}
 
 	bufBytes := buf.Bytes()
 
 	base64Encoded := base64.StdEncoding.EncodeToString(bufBytes)
 
-	response.Data =  base64Encoded
+	response.Data = base64Encoded
 
 	sendResponse("readMemory", seq, true, response)
 }
@@ -936,7 +935,7 @@ func sendScreenUpdates() {
 		Status:  statusString,
 		Stats: map[string]int{
 			"di":  int(liveEmulator.di),
-			"mem": int(liveEmulator.memUsage)+len(liveAssembledResult.ProgramData),
+			"mem": int(liveEmulator.memUsage) + len(liveAssembledResult.ProgramData),
 			"reg": int(liveEmulator.regUsage),
 			"si":  len(liveAssembledResult.ProgramText),
 		},

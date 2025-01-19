@@ -526,7 +526,7 @@ func (inst *EmulatorInstance) executeEnv(instruction uint32) {
 			if imm == 0b000000000000 {
 				if inst.osEntry == 0 {
 					// no os entry point, so throw an exception
-					inst.newException("No ECALL handler registered. Perhaps the assignment file wasn't specified?")
+					inst.newException("No ECALL handler registered. Perhaps the assignment file wasn't specified, or the editor is in the wrong folder?")
 					return
 				}
 
