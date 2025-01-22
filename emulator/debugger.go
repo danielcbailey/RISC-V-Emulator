@@ -983,6 +983,7 @@ func sendScreenUpdates() {
 			"mem": int(liveEmulator.memUsage) + len(liveAssembledResult.ProgramData),
 			"reg": int(liveEmulator.regUsage),
 			"si":  len(liveAssembledResult.ProgramText),
+			"pc":  int(liveEmulator.pc),
 		},
 		Memory: map[string]string{
 			"main":  mainMemory,
