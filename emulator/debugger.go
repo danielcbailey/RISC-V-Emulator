@@ -912,12 +912,48 @@ func sendToClient(data interface{}) {
 	fmt.Print("Content-Length: " + strconv.Itoa(len(b)) + "\r\n\r\n" + string(b))
 }
 
+func getMemoryBase64(offset int) string {
+	count := 1024
+
+	blockVal, ok := liveEmulator.memory.Blocks[uint32(offset>>12)]
+
+	block := blockVal.Block
+
+	if !ok {
+		sendOutput("Failed to read gp memory.", true)
+		return ""
+	}
+
+	buf := new(bytes.Buffer)
+
+	start := (offset & 0xFFF) >> 2
+	end := (start + count)
+
+	if end >= len(block) {
+		end = len(block) - 1
+	}
+
+	// encode block into base64
+	for i := start; i <= end; i++ {
+		binary.Write(buf, binary.BigEndian, block[i])
+	}
+
+	bufBytes := buf.Bytes()
+
+	base64Encoded := base64.StdEncoding.EncodeToString(bufBytes)
+
+	return base64Encoded
+}
+
 func sendScreenUpdates() {
 	statusString := "running"
 	if liveEmulator.solutionValidity == 1 {
 		statusString = "failed"
 	} else if liveEmulator.solutionValidity == 2 {
 		statusString = "passed"
+	} else if liveEmulator.pc == 0x20352035 || liveEmulator.pc == 0x20352034 {
+		// magic number to end the emulatgor
+		statusString = "finished"
 	}
 
 	type ScreenUpdate struct {
@@ -926,7 +962,16 @@ func sendScreenUpdates() {
 		Updates []VirtualDisplayUpdate `json:"updates"`
 		Status  string                 `json:"status"`
 		Stats   map[string]int         `json:"stats"`
+		Memory  map[string]string      `json:"memory"`
 	}
+
+	// Get current gp memory and stack memory
+	// for memory: start at gp
+	// for stack: magic number 0x7FFFFFF0
+	gp := liveEmulator.registers[3]
+
+	mainMemory := getMemoryBase64(int(gp))
+	stackMemory := getMemoryBase64(0x7FFFFFF0)
 
 	packet := ScreenUpdate{
 		Width:   liveEmulator.display.width,
@@ -938,6 +983,10 @@ func sendScreenUpdates() {
 			"mem": int(liveEmulator.memUsage) + len(liveAssembledResult.ProgramData),
 			"reg": int(liveEmulator.regUsage),
 			"si":  len(liveAssembledResult.ProgramText),
+		},
+		Memory: map[string]string{
+			"main":  mainMemory,
+			"stack": stackMemory,
 		},
 	}
 
