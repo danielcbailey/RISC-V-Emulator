@@ -515,12 +515,16 @@ func handleStepIn(seq int) {
 }
 
 func handleStepOut(seq int) {
-	// get line of last callstack frame
-	liveEmulator.breakAddr = liveEmulator.callStack[len(liveEmulator.callStack)-1] + 4
-	if continueChan != nil {
-		continueChan <- true
+	if len(liveEmulator.callStack) < 1 {
+		sendOutput("Not currently in a function call; cannot Step Out.", true)
+	} else {
+		// get line of last callstack frame
+		liveEmulator.breakAddr = liveEmulator.callStack[len(liveEmulator.callStack)-1] + 4
+		if continueChan != nil {
+			continueChan <- true
+		}
+		sendResponse("stepOut", seq, true, EmptyResponse{})
 	}
-	sendResponse("stepOut", seq, true, EmptyResponse{})
 }
 
 func handleContinue(seq int) {
@@ -952,7 +956,7 @@ func sendScreenUpdates() {
 	} else if liveEmulator.solutionValidity == 2 {
 		statusString = "passed"
 	} else if liveEmulator.pc == 0x20352035 || liveEmulator.pc == 0x20352034 {
-		// magic number to end the emulatgor
+		// magic number to end the emulator
 		statusString = "finished"
 	}
 
@@ -992,5 +996,6 @@ func sendScreenUpdates() {
 	}
 
 	sendEvent("riscv_screen", packet)
-	sendOutput("sent screen update!", true)
+	//sendOutput(fmt.Sprintf("PC: %d", int(liveEmulator.pc)), true)
+	//sendOutput("sent screen update!", true)
 }
