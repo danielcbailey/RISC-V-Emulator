@@ -2,7 +2,10 @@ package emulator
 
 import (
 	"bufio"
+	"bytes"
 	"debug/elf"
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -133,6 +136,8 @@ func dispatchCommand(command string, data json.RawMessage, seq int) {
 		handleGetScopes(data, seq)
 	case "variables":
 		handleGetVariables(data, seq)
+	case "readMemory":
+		handleReadMemory(data, seq)
 	case "restart":
 		handleRestart(data, seq)
 	case "dataBreakpointInfo":
@@ -510,7 +515,7 @@ func handleStepIn(seq int) {
 }
 
 func handleStepOut(seq int) {
-	if (len(liveEmulator.callStack) < 1) {
+	if len(liveEmulator.callStack) < 1 {
 		sendOutput("Not currently in a function call; cannot Step Out.", true)
 	} else {
 		// get line of last callstack frame
@@ -638,6 +643,10 @@ func handleGetScopes(data json.RawMessage, seq int) {
 		Name:               "registers",
 		PresentationHint:   "registers",
 		VariablesReference: 32,
+	}, {
+		Name:               "memory",
+		PresentationHint:   "memory",
+		VariablesReference: 500,
 	}}
 
 	scopesResponse := struct {
@@ -645,6 +654,58 @@ func handleGetScopes(data json.RawMessage, seq int) {
 	}{Scopes: scopes}
 
 	sendResponse("scopes", seq, true, scopesResponse)
+}
+
+func handleReadMemory(data json.RawMessage, seq int) {
+	request := struct {
+		MemoryReference string `json:"memoryReference"` // memory reference to base location to read data
+		Offset          int    `json:"offset"`          // offset in bytes to memory reference
+		Count           int    `json:"count"`           // number of bytes to read at given location
+	}{}
+	json.Unmarshal(data, &request)
+
+	response := struct {
+		Address         string `json:"address"`         // address of first byte
+		UnreadableBytes string `json:"unreadableBytes"` // unreadable bytes after last successfully read byte
+		Data            string `json:"data"`            // resulting bytes encoded in base64
+	}{}
+
+	// ignoring edge cases for now
+	response.Address = "0"
+	response.UnreadableBytes = ""
+	response.Data = ""
+
+	blockVal, ok := liveEmulator.memory.Blocks[uint32(request.Offset>>12)]
+
+	// Pages are lazily loaded, so unless a stack operation has occurred we can't guarantee the memory exists
+	if !ok {
+		sendResponse("readMemory", seq, true, response)
+		return
+	}
+
+	block := blockVal.Block
+
+	buf := new(bytes.Buffer)
+
+	start := (request.Offset & 0xFFF) >> 2
+	end := (start + request.Count)
+
+	if end >= len(block) {
+		end = len(block) - 1
+	}
+
+	// encode block into base64
+	for i := start; i <= end; i++ {
+		binary.Write(buf, binary.BigEndian, block[i])
+	}
+
+	bufBytes := buf.Bytes()
+
+	base64Encoded := base64.StdEncoding.EncodeToString(bufBytes)
+
+	response.Data = base64Encoded
+
+	sendResponse("readMemory", seq, true, response)
 }
 
 func handleGetVariables(data json.RawMessage, seq int) {
@@ -855,6 +916,39 @@ func sendToClient(data interface{}) {
 	fmt.Print("Content-Length: " + strconv.Itoa(len(b)) + "\r\n\r\n" + string(b))
 }
 
+func getMemoryBase64(offset int) string {
+	count := 1024
+
+	blockVal, ok := liveEmulator.memory.Blocks[uint32(offset>>12)]
+
+	block := blockVal.Block
+
+	if !ok {
+		sendOutput("Failed to read gp memory.", true)
+		return ""
+	}
+
+	buf := new(bytes.Buffer)
+
+	start := (offset & 0xFFF) >> 2
+	end := (start + count)
+
+	if end >= len(block) {
+		end = len(block) - 1
+	}
+
+	// encode block into base64
+	for i := start; i <= end; i++ {
+		binary.Write(buf, binary.BigEndian, block[i])
+	}
+
+	bufBytes := buf.Bytes()
+
+	base64Encoded := base64.StdEncoding.EncodeToString(bufBytes)
+
+	return base64Encoded
+}
+
 func sendScreenUpdates() {
 	statusString := "running"
 	if liveEmulator.solutionValidity == 1 {
@@ -864,15 +958,24 @@ func sendScreenUpdates() {
 	} else if liveEmulator.pc == 0x20352035 || liveEmulator.pc == 0x20352034 {
 		// magic number to end the emulator
 		statusString = "finished"
-	} 
-	
+	}
+
 	type ScreenUpdate struct {
 		Width   int                    `json:"width"`
 		Height  int                    `json:"height"`
 		Updates []VirtualDisplayUpdate `json:"updates"`
 		Status  string                 `json:"status"`
 		Stats   map[string]int         `json:"stats"`
+		Memory  map[string]string      `json:"memory"`
 	}
+
+	// Get current gp memory and stack memory
+	// for memory: start at gp
+	// for stack: magic number 0x7FFFFFF0
+	gp := liveEmulator.registers[3]
+
+	mainMemory := getMemoryBase64(int(gp))
+	stackMemory := getMemoryBase64(0x7FFFFFF0)
 
 	packet := ScreenUpdate{
 		Width:   liveEmulator.display.width,
@@ -885,6 +988,10 @@ func sendScreenUpdates() {
 			"reg": int(liveEmulator.regUsage),
 			"si":  len(liveAssembledResult.ProgramText),
 			"pc":  int(liveEmulator.pc),
+		},
+		Memory: map[string]string{
+			"main":  mainMemory,
+			"stack": stackMemory,
 		},
 	}
 
