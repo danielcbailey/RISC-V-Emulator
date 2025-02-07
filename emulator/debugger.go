@@ -494,15 +494,28 @@ func handleStepOver(seq int) {
 	// decoding instruction
 	opcode := assembler.GetOpCode(instruction)
 
-	if opcode == assembler.OPCODE_JALR || opcode == assembler.OPCODE_JAL {
+	switch opcode {
+	case assembler.OPCODE_JAL:
+		_, rd, _ := assembler.DecodeJTypeInstruction(instruction)
+
+		if rd == 0 {
+			liveEmulator.breakNext = true
+		} else {
+			liveEmulator.breakAddr = liveEmulator.pc + 4
+		}
+
+		break
+
+	case assembler.OPCODE_JALR:
 		liveEmulator.breakAddr = liveEmulator.pc + 4
-	} else {
+	default:
 		liveEmulator.breakNext = true
 	}
 
 	if continueChan != nil {
 		continueChan <- true
 	}
+
 	sendResponse("next", seq, true, EmptyResponse{})
 }
 
