@@ -114,9 +114,12 @@ func (a *AssembledResult) EvaluateHover(position TextPosition) (string, bool) {
 		for _, v := range operands {
 			if position.Char-diff < pos+len(v) {
 				// the hover is over this operand
-				evRes, err := a.Evaluate(v)
+				evRes, err := a.Evaluate(v, 12, true) 
 				if err != nil {
-					return "", false
+					evRes, err = a.Evaluate(v, 32, false)
+					if err != nil {
+						return "", false
+					}
 				}
 
 				if evRes.Type == EvaluationTypeLabel {

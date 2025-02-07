@@ -27,7 +27,7 @@ func checkValidSymbolName(str string) (bool, string) {
 	return true, ""
 }
 
-func (a *AssembledResult) Evaluate(str string) (EvaluationResult, error) {
+func (a *AssembledResult) Evaluate(str string, fieldWidth int, signed bool) (EvaluationResult, error) {
 	str = strings.TrimSpace(str)
 	if len(str) == 0 {
 		return EvaluationResult{}, EvaluationErrors.InvalidExpression(str)
@@ -54,6 +54,10 @@ func (a *AssembledResult) Evaluate(str string) (EvaluationResult, error) {
 
 	// check if it is a base 16 integer (must have 0x prefix)
 	if len(str) > 2 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X') {
+		// check if too many digits for the fieldWidth
+		if len(str[2:])> fieldWidth/4 { 
+			return EvaluationResult{}, EvaluationErrors.ImmOverflow(str)
+		}
 		// check if the rest of the string is valid
 		for _, char := range str[2:] {
 			if !((char >= 'a' && char <= 'f') || (char >= 'A' && char <= 'F') || (char >= '0' && char <= '9')) {
@@ -61,12 +65,34 @@ func (a *AssembledResult) Evaluate(str string) (EvaluationResult, error) {
 			}
 		}
 		// convert to base 10
-		value, err := strconv.ParseInt(str[2:], 16, 64)
+		hexdigits := str[2:]
+		MSHdigit := hexdigits[0:1] // most significant hex digit
+		MSDecimal, e := strconv.ParseInt(MSHdigit, 16, 64) // decimal equivalent of MSHdigit
+		if signed && e == nil && MSDecimal > 7 && len(hexdigits) == fieldWidth/4 {  
+			switch fieldWidth {
+				case 12 : hexdigits = "F" + hexdigits
+				case 20 : hexdigits = "FFF" + hexdigits
+			}
+			value, err := strconv.ParseInt(hexdigits, 16, 64)
+			if err != nil {
+				return EvaluationResult{}, err
+			}
+			
+			switch fieldWidth {
+				case 12 : value = int64(int16(value))
+				case 20 : value = int64(int32(value))
+			}
+			
+			return EvaluationResult{Value: value, Type: EvaluationTypeIntegerLiteral, MatchedValue: str}, nil
+			
+		}
+		value, err := strconv.ParseInt(hexdigits, 16, 64)
 		if err != nil {
 			return EvaluationResult{}, err
 		}
 		return EvaluationResult{Value: value, Type: EvaluationTypeUnsignedIntegerLiteral, MatchedValue: str}, nil
 	}
+
 
 	// check if it is a base 10 integer
 	for _, char := range str {
@@ -80,15 +106,15 @@ func (a *AssembledResult) Evaluate(str string) (EvaluationResult, error) {
 		return EvaluationResult{}, err
 	}
 
-	if value > 0 {
+	if value >= 0 {
 		return EvaluationResult{Value: value, Type: EvaluationTypeUnsignedIntegerLiteral, MatchedValue: str}, nil
 	}
 
 	return EvaluationResult{Value: value, Type: EvaluationTypeIntegerLiteral, MatchedValue: str}, nil
 }
 
-func (a *AssembledResult) EvaluateAndReportErrors(str string, line, charPos int) (EvaluationResult, bool) {
-	result, err := a.Evaluate(str)
+func (a *AssembledResult) EvaluateAndReportErrors(str string, fieldWidth int, signed bool, line, charPos int) (EvaluationResult, bool) {
+	result, err := a.Evaluate(str, fieldWidth, signed)
 	if err != nil && EvaluationErrors.IsUnresolvedSymbolError(err) {
 		a.Diagnostics = append(a.Diagnostics, Errors.UnresolvedSymbolName(str, TextRange{
 			Start: TextPosition{Line: line, Char: charPos}, End: TextPosition{Line: line, Char: charPos + len(str)},
@@ -103,6 +129,11 @@ func (a *AssembledResult) EvaluateAndReportErrors(str string, line, charPos int)
 		a.Diagnostics = append(a.Diagnostics, Errors.InvalidExpression(str, TextRange{
 			Start: TextPosition{Line: line, Char: charPos}, End: TextPosition{Line: line, Char: charPos + len(str)},
 		}))
+		return EvaluationResult{}, false
+	} else if err != nil && EvaluationErrors.IsImmOverflowError(err) {
+		a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(str, fieldWidth, TextRange{
+			Start: TextPosition{Line: line, Char: charPos}, End: TextPosition{Line: line, Char: charPos + len(str)},
+		})) 
 		return EvaluationResult{}, false
 	} else if err != nil {
 		a.Diagnostics = append(a.Diagnostics, Errors.AnonymousError(err.Error(), TextRange{
@@ -161,7 +192,7 @@ func (a *AssembledResult) parseRTypeInstruction(line string, diff, lineNum int, 
 	operand1 := parts[0][strings.Index(parts[0], " ")+1:]
 
 	// parse operand 1
-	dest, err := a.Evaluate(operand1)
+	dest, err := a.Evaluate(operand1, 0, false)
 	if err != nil || dest.Type != EvaluationTypeRegister {
 		offset := diff + len(opcode) + 1
 		a.Diagnostics = append(a.Diagnostics, Errors.InvalidRegister(operand1, TextRange{
@@ -171,7 +202,7 @@ func (a *AssembledResult) parseRTypeInstruction(line string, diff, lineNum int, 
 	}
 
 	// parse operand 2
-	op1, err := a.Evaluate(parts[1])
+	op1, err := a.Evaluate(parts[1], 0, false)
 	if err != nil || op1.Type != EvaluationTypeRegister {
 		offset := diff + len(opcode) + 1 + len(operand1) + 1
 		a.Diagnostics = append(a.Diagnostics, Errors.InvalidRegister(parts[1], TextRange{
@@ -181,7 +212,7 @@ func (a *AssembledResult) parseRTypeInstruction(line string, diff, lineNum int, 
 	}
 
 	// parse operand 3
-	op2, err := a.Evaluate(parts[2])
+	op2, err := a.Evaluate(parts[2], 0, false)
 	if err != nil || op2.Type != EvaluationTypeRegister {
 		offset := diff + len(opcode) + 1 + len(operand1) + 1 + len(parts[1]) + 1
 		a.Diagnostics = append(a.Diagnostics, Errors.InvalidRegister(parts[2], TextRange{
@@ -328,6 +359,7 @@ func (a *AssembledResult) parseITypeInstruction(line string, diff, lineNum int, 
 		deOp = 0b0010011
 		func3 = 0b101
 		isSRA = true
+		unsigned = true
 	case "slti":
 		deOp = 0b0010011
 		func3 = 0b010
@@ -341,7 +373,7 @@ func (a *AssembledResult) parseITypeInstruction(line string, diff, lineNum int, 
 	}
 
 	// parse operand 1
-	dest, err := a.Evaluate(operand1)
+	dest, err := a.Evaluate(operand1, 0, false)
 	if err != nil || dest.Type != EvaluationTypeRegister {
 		offset := diff + len(opcode) + 1
 		a.Diagnostics = append(a.Diagnostics, Errors.InvalidRegister(operand1, TextRange{
@@ -351,7 +383,7 @@ func (a *AssembledResult) parseITypeInstruction(line string, diff, lineNum int, 
 	}
 
 	// parse operand 2
-	op1, err := a.Evaluate(parts[1])
+	op1, err := a.Evaluate(parts[1], 0, false)
 	if err != nil || op1.Type != EvaluationTypeRegister {
 		offset := diff + len(opcode) + 1 + len(operand1) + 1
 		a.Diagnostics = append(a.Diagnostics, Errors.InvalidRegister(parts[1], TextRange{
@@ -361,14 +393,17 @@ func (a *AssembledResult) parseITypeInstruction(line string, diff, lineNum int, 
 	}
 
 	// parse operand 3
-	op2, err := a.Evaluate(parts[2])
+	op2, err := a.Evaluate(parts[2], 12, !unsigned)
+	immOverflow := (err != nil && EvaluationErrors.IsImmOverflowError((err)))
 	immTypeValid := true
 	if unsigned && op2.Type != EvaluationTypeUnsignedIntegerLiteral && op2.Type != EvaluationTypeLabel {
 		immTypeValid = false
 	} else if !unsigned && op2.Type != EvaluationTypeIntegerLiteral && op2.Type != EvaluationTypeUnsignedIntegerLiteral && op2.Type != EvaluationTypeLabel {
 		immTypeValid = false
 	}
-	if err != nil || !immTypeValid {
+	// check for invalid integers given as immediates (but handle immediate
+	// overflow errors below so target range can be given in error msg)
+	if (err != nil && !immOverflow) || !immTypeValid {
 		offset := diff + len(opcode) + 1 + len(operand1) + 1 + len(parts[1]) + 1
 		if !unsigned {
 			a.Diagnostics = append(a.Diagnostics, Errors.InvalidIntegerLiteral(parts[2], TextRange{
@@ -383,9 +418,12 @@ func (a *AssembledResult) parseITypeInstruction(line string, diff, lineNum int, 
 	}
 
 	// checking for immediate overflow
+	if !unsigned && op2.Type == EvaluationTypeUnsignedIntegerLiteral {
+		op2.Type = EvaluationTypeIntegerLiteral
+	}
 	if op2.Type == EvaluationTypeIntegerLiteral || op2.Type == EvaluationTypeLabel {
 		// maximum of 12 bits
-		if op2.Value > 2047 || op2.Value < -2048 {
+		if immOverflow || op2.Value > 2047 || op2.Value < -2048 {  
 			offset := diff + len(opcode) + 1 + len(operand1) + 1 + len(parts[1]) + 1
 			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[2], 12, TextRange{
 				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[2])},
@@ -394,13 +432,13 @@ func (a *AssembledResult) parseITypeInstruction(line string, diff, lineNum int, 
 		}
 	} else if op2.Type == EvaluationTypeUnsignedIntegerLiteral {
 		// maximum of 12 bits
-		if op2.Value > 4095 {
+		if immOverflow || op2.Value > 4095 {
 			offset := diff + len(opcode) + 1 + len(operand1) + 1 + len(parts[1]) + 1
-			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[2], 12, TextRange{
+			a.Diagnostics = append(a.Diagnostics, Errors.UnsignedImmediateOverflow(parts[2], 12, TextRange{
 				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[2])},
 			}))
 			return 0, false
-		} else if !unsigned && op2.Value > 2047 {
+		} else if immOverflow || (!unsigned && op2.Value > 2047) {
 			offset := diff + len(opcode) + 1 + len(operand1) + 1 + len(parts[1]) + 1
 			a.Diagnostics = append(a.Diagnostics, Warnings.UnintendedSignExtension(parts[2], TextRange{
 				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[2])},
@@ -459,7 +497,7 @@ func (a *AssembledResult) parseITypeMemInstruction(line string, diff, lineNum in
 	operand3 := parts[1][strings.Index(parts[1], "(")+1 : strings.Index(parts[1], ")")]
 
 	// parse operand 1
-	dest, e := a.Evaluate(operand1)
+	dest, e := a.Evaluate(operand1, 0, false)
 	if e != nil {
 		offset := diff + len(opcode) + 1
 		a.Diagnostics = append(a.Diagnostics, Errors.InvalidRegister(operand1, TextRange{
@@ -469,7 +507,8 @@ func (a *AssembledResult) parseITypeMemInstruction(line string, diff, lineNum in
 	}
 
 	// parse operand 2
-	op2, ok := a.EvaluateAndReportErrors(operand2, lineNum, diff+len(parts[0])+1)
+
+	op2, ok := a.EvaluateAndReportErrors(operand2, 12, true, lineNum, diff+len(parts[0])+1)
 	if !ok {
 		return 0, false
 	} else if op2.Type == EvaluationTypeRegister {
@@ -478,9 +517,9 @@ func (a *AssembledResult) parseITypeMemInstruction(line string, diff, lineNum in
 		}))
 		return 0, false
 	}
-
+    
 	// parse operand 3
-	op3, e := a.Evaluate(operand3)
+	op3, e := a.Evaluate(operand3, 0, false)
 	if e != nil || op3.Type != EvaluationTypeRegister {
 		offset := diff + strings.Index(line, "(") + 1
 		a.Diagnostics = append(a.Diagnostics, Errors.InvalidRegister(operand3, TextRange{
@@ -490,21 +529,23 @@ func (a *AssembledResult) parseITypeMemInstruction(line string, diff, lineNum in
 	}
 
 	// check if immediate is in range
-	if op2.Type == EvaluationTypeUnsignedIntegerLiteral {
-		// maximum of 12 bits
-		if op2.Value > 4095 {
-			offset := diff + len(parts[0]) + 1
-			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[1], 12, TextRange{
-				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[1])},
-			}))
-			return 0, false
-		}
-	} else if op2.Type == EvaluationTypeIntegerLiteral || op2.Type == EvaluationTypeLabel {
+	/*
+		if op2.Type == EvaluationTypeUnsignedIntegerLiteral {
+			// maximum of 12 bits
+			if op2.Value > 4095 {
+				offset := diff + len(parts[0]) + 1
+				a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[1], 12, TextRange{
+					Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[1])},
+				}))
+				return 0, false
+			}
+		} else */
+	if op2.Type == EvaluationTypeIntegerLiteral || op2.Type == EvaluationTypeLabel || op2.Type == EvaluationTypeUnsignedIntegerLiteral {
 		// maximum of 12 bits
 		if op2.Value < -2048 || op2.Value > 2047 {
 			offset := diff + len(parts[0]) + 1
-			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[1], 12, TextRange{
-				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[1])},
+			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(operand2, 12, TextRange{
+				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(operand2)},
 			}))
 			return 0, false
 		}
@@ -576,7 +617,7 @@ func (a *AssembledResult) parseSTypeInstruction(line string, diff int, lineNum i
 	operand3 := parts[1][strings.Index(parts[1], "(")+1 : strings.Index(parts[1], ")")]
 
 	// parse operand 1
-	src, e := a.Evaluate(operand1)
+	src, e := a.Evaluate(operand1, 0, false)
 	if e != nil {
 		offset := diff + len(opcode) + 1
 		a.Diagnostics = append(a.Diagnostics, Errors.InvalidRegister(operand1, TextRange{
@@ -586,7 +627,7 @@ func (a *AssembledResult) parseSTypeInstruction(line string, diff int, lineNum i
 	}
 
 	// parse operand 2
-	op2, ok := a.EvaluateAndReportErrors(operand2, lineNum, diff+len(parts[0])+1)
+	op2, ok := a.EvaluateAndReportErrors(operand2, 12, true, lineNum, diff+len(parts[0])+1)
 	if !ok {
 		return 0, false
 	} else if op2.Type == EvaluationTypeRegister {
@@ -597,7 +638,7 @@ func (a *AssembledResult) parseSTypeInstruction(line string, diff int, lineNum i
 	}
 
 	// parse operand 3
-	op3, e := a.Evaluate(operand3)
+	op3, e := a.Evaluate(operand3, 0, false)
 	if e != nil || op3.Type != EvaluationTypeRegister {
 		offset := diff + strings.Index(line, "(") + 1
 		a.Diagnostics = append(a.Diagnostics, Errors.InvalidRegister(operand3, TextRange{
@@ -607,21 +648,23 @@ func (a *AssembledResult) parseSTypeInstruction(line string, diff int, lineNum i
 	}
 
 	// check if immediate is in range
-	if op2.Type == EvaluationTypeUnsignedIntegerLiteral {
-		// maximum of 12 bits
-		if op2.Value > 4095 {
-			offset := diff + len(parts[0]) + 1
-			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[1], 12, TextRange{
-				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[1])},
-			}))
-			return 0, false
-		}
-	} else if op2.Type == EvaluationTypeIntegerLiteral || op2.Type == EvaluationTypeLabel {
+	/*
+		if op2.Type == EvaluationTypeUnsignedIntegerLiteral {
+			// maximum of 12 bits
+			if op2.Value > 4095 {
+				offset := diff + len(parts[0]) + 1
+				a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[1], 12, TextRange{
+					Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[1])},
+				}))
+				return 0, false
+			}
+		} else */
+	if op2.Type == EvaluationTypeIntegerLiteral || op2.Type == EvaluationTypeLabel || op2.Type == EvaluationTypeUnsignedIntegerLiteral {
 		// maximum of 12 bits
 		if op2.Value < -2048 || op2.Value > 2047 {
 			offset := diff + len(parts[0]) + 1
-			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[1], 12, TextRange{
-				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[1])},
+			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(operand2, 12, TextRange{
+				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(operand2)},
 			}))
 			return 0, false
 		}
@@ -667,7 +710,7 @@ func (a *AssembledResult) parseBTypeInstruction(line string, diff, lineNum int, 
 	operand1 := parts[0][strings.Index(parts[0], " ")+1:]
 
 	// parse operand 1
-	src, e := a.Evaluate(operand1)
+	src, e := a.Evaluate(operand1, 0, false)
 	if e != nil {
 		offset := len(opcode) + 1 + diff
 		a.Diagnostics = append(a.Diagnostics, Errors.InvalidRegister(operand1, TextRange{
@@ -677,7 +720,7 @@ func (a *AssembledResult) parseBTypeInstruction(line string, diff, lineNum int, 
 	}
 
 	// parse operand 2
-	op2, e := a.Evaluate(parts[1])
+	op2, e := a.Evaluate(parts[1], 0, false)
 	if e != nil || op2.Type != EvaluationTypeRegister {
 		offset := len(parts[0]) + 1 + diff
 		a.Diagnostics = append(a.Diagnostics, Errors.InvalidRegister(parts[1], TextRange{
@@ -687,7 +730,7 @@ func (a *AssembledResult) parseBTypeInstruction(line string, diff, lineNum int, 
 	}
 
 	// parse operand 3
-	op3, ok := a.EvaluateAndReportErrors(parts[2], lineNum, diff+len(parts[0])+1+len(parts[1])+1)
+	op3, ok := a.EvaluateAndReportErrors(parts[2], 12, true, lineNum, diff+len(parts[0])+1+len(parts[1])+1)
 	if !ok {
 		return 0, false
 	} else if op3.Type == EvaluationTypeRegister {
@@ -698,21 +741,23 @@ func (a *AssembledResult) parseBTypeInstruction(line string, diff, lineNum int, 
 	}
 
 	// check if immediate is in range
-	if op2.Type == EvaluationTypeUnsignedIntegerLiteral {
+	/*
+		if op3.Type == EvaluationTypeUnsignedIntegerLiteral {
+			// maximum of 13 bits
+			if op3.Value > 2047 {
+				offset := len(parts[0]) + 1 + diff + len(parts[1]) + 1
+				a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[2], 12, TextRange{
+					Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[2])},
+				}))
+				return 0, false
+			}
+		} else */
+	if op3.Type == EvaluationTypeIntegerLiteral || op3.Type == EvaluationTypeLabel || op3.Type == EvaluationTypeUnsignedIntegerLiteral {
 		// maximum of 13 bits
-		if op2.Value > 8191 {
-			offset := len(parts[0]) + 1 + diff
-			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[1], 13, TextRange{
-				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[1])},
-			}))
-			return 0, false
-		}
-	} else if op2.Type == EvaluationTypeIntegerLiteral || op2.Type == EvaluationTypeLabel {
-		// maximum of 13 bits
-		if op2.Value < -4096 || op2.Value > 4095 {
-			offset := len(parts[0]) + 1 + diff
-			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[1], 13, TextRange{
-				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[1])},
+		if op3.Value < -4096 || op3.Value > 4095 {
+			offset := len(parts[0]) + 1 + diff + len(parts[1]) + 1
+			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[2], 13, TextRange{
+				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[2])},
 			}))
 			return 0, false
 		}
@@ -768,7 +813,7 @@ func (a *AssembledResult) parseJTypeInstruction(line string, diff, lineNum int, 
 	operand1 := parts[0][strings.Index(parts[0], " ")+1:]
 
 	// parse operand 1
-	src, e := a.Evaluate(operand1)
+	src, e := a.Evaluate(operand1, 0, false)
 	if e != nil {
 		offset := len(opcode) + 1 + diff
 		a.Diagnostics = append(a.Diagnostics, Errors.InvalidRegister(operand1, TextRange{
@@ -784,7 +829,7 @@ func (a *AssembledResult) parseJTypeInstruction(line string, diff, lineNum int, 
 	}
 
 	// parse operand 2
-	op2, ok := a.EvaluateAndReportErrors(parts[1], lineNum, diff+len(parts[0])+1)
+	op2, ok := a.EvaluateAndReportErrors(parts[1], 20, true, lineNum, diff+len(parts[0])+1)
 	if !ok {
 		return 0, false
 	} else if op2.Type == EvaluationTypeIntegerLiteral || op2.Type == EvaluationTypeUnsignedIntegerLiteral {
@@ -836,7 +881,7 @@ func (a *AssembledResult) parseUTypeInstruction(line string, diff, lineNum int, 
 	operand1 := parts[0][strings.Index(parts[0], " ")+1:]
 
 	// parse operand 1
-	src, e := a.Evaluate(operand1)
+	src, e := a.Evaluate(operand1, 0, false)
 	if e != nil {
 		offset := len(opcode) + 1 + diff
 		a.Diagnostics = append(a.Diagnostics, Errors.InvalidRegister(operand1, TextRange{
@@ -852,7 +897,7 @@ func (a *AssembledResult) parseUTypeInstruction(line string, diff, lineNum int, 
 	}
 
 	// parse operand 2
-	op2, ok := a.EvaluateAndReportErrors(parts[1], lineNum, diff+len(parts[0])+1)
+	op2, ok := a.EvaluateAndReportErrors(parts[1], 20, false, lineNum, diff+len(parts[0])+1)
 	if !ok {
 		return 0, false
 	} else if op2.Type == EvaluationTypeRegister {
@@ -879,7 +924,7 @@ func (a *AssembledResult) parseUTypeInstruction(line string, diff, lineNum int, 
 		// maximum of 32 bits
 		if op2.Value > 0xFFFFFFFF {
 			offset := diff + len(parts[0]) + 1
-			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[1], 20, TextRange{
+			a.Diagnostics = append(a.Diagnostics, Errors.UnsignedImmediateOverflow(parts[1], 20, TextRange{
 				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[1])},
 			}))
 			return 0, false
@@ -962,8 +1007,8 @@ func (a *AssembledResult) resolveLabelLinkRequests() {
 			imm := uint32(0)
 			if request.isBranch || a.LabelTypes[request.labelName] == "text" {
 				// if is branch, the label should be relative to the instruction address
-				immInt := int32(labelAddr - currAddr)
-				if immInt > 0x7FF || immInt < -0x800 {
+				immInt := int32((labelAddr - currAddr))
+				if immInt > 4095 || immInt < -4096 {
 					lineNum := a.AddressToLine[address]
 					charPos := strings.Index(a.fileContents[lineNum], request.labelName)
 					a.Diagnostics = append(a.Diagnostics, Errors.LabelTooFar(request.labelName, TextRange{
@@ -981,8 +1026,8 @@ func (a *AssembledResult) resolveLabelLinkRequests() {
 			// J type
 			opcode, rd, _ := DecodeJTypeInstruction(instruction)
 			// the label should be treated as relative to the instruction address
-			immInt := int32(labelAddr - currAddr)
-			if immInt > 0x7FFFF || immInt < -0x80000 {
+			immInt := int32((labelAddr - currAddr))
+			if immInt > 0xFFFFF || immInt < -0x100000 { // +/- 1M
 				lineNum := a.AddressToLine[address]
 				charPos := strings.Index(a.fileContents[lineNum], request.labelName)
 				a.Diagnostics = append(a.Diagnostics, Errors.LabelTooFar(request.labelName, TextRange{
@@ -1002,8 +1047,8 @@ func (a *AssembledResult) resolveLabelLinkRequests() {
 			// B type
 			opcode, rs1, rs2, _, func3 := DecodeBTypeInstruction(instruction)
 			// the label should be treated as relative to the instruction address
-			immInt := int32(labelAddr - currAddr)
-			if immInt > 0x7FF || immInt < -0x800 {
+			immInt := int32((labelAddr - currAddr))
+			if immInt > 4095 || immInt < -4096 {
 				lineNum := a.AddressToLine[address]
 				charPos := strings.Index(a.fileContents[lineNum], request.labelName)
 				a.Diagnostics = append(a.Diagnostics, Errors.LabelTooFar(request.labelName, TextRange{
@@ -1194,7 +1239,7 @@ func (a *AssembledResult) parseLines() {
 			if dType == ".word" {
 				charOffset := diff + len(dType) + 1
 				for _, value := range values {
-					evalRes, _ := a.EvaluateAndReportErrors(value, i, charOffset)
+					evalRes, _ := a.EvaluateAndReportErrors(value, 64, false, i, charOffset)
 					charOffset += len(value) + 1
 					if evalRes.Type == EvaluationTypeLabel || evalRes.Type == EvaluationTypeRegister {
 						// error
@@ -1232,7 +1277,7 @@ func (a *AssembledResult) parseLines() {
 				}
 			} else if dType == ".space" {
 				offset := diff + len(dType) + 1
-				evalRes, ok := a.EvaluateAndReportErrors(values[0], i, offset)
+				evalRes, ok := a.EvaluateAndReportErrors(values[0], 64, false, i, offset)
 				if ok {
 					if evalRes.Type == EvaluationTypeLabel || evalRes.Type == EvaluationTypeRegister {
 						// error
@@ -1247,7 +1292,7 @@ func (a *AssembledResult) parseLines() {
 				}
 			} else if dType == ".alloc" {
 				offset := diff + len(dType) + 1
-				evalRes, ok := a.EvaluateAndReportErrors(values[0], i, offset)
+				evalRes, ok := a.EvaluateAndReportErrors(values[0], 64, false, i, offset)
 				if ok {
 					if evalRes.Type == EvaluationTypeLabel || evalRes.Type == EvaluationTypeRegister {
 						// error

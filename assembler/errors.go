@@ -99,6 +99,16 @@ func (assemblyError) ImmediateOverflow(value string, maxSize int, r TextRange) D
 	r, value = AdjustRange(r, value)
 	return Diagnostic{
 		Range:    r,
+		Message:  "Immediate value \"" + value + "\" is out of range of " + strconv.Itoa(maxSize) + " bits [-" + strconv.Itoa(int(math.Pow(2, float64(maxSize-1)))) + ", " + strconv.Itoa(int(math.Pow(2, float64(maxSize-1)))) + ")",
+		Source:   "Assembler",
+		Severity: Error,
+	}
+}
+
+func (assemblyError) UnsignedImmediateOverflow(value string, maxSize int, r TextRange) Diagnostic {
+	r, value = AdjustRange(r, value)
+	return Diagnostic{
+		Range:    r,
 		Message:  "Immediate value \"" + value + "\" is too large. Must be less than " + strconv.Itoa(maxSize) + " bits (" + strconv.Itoa(int(math.Pow(2, float64(maxSize)))) + ")",
 		Source:   "Assembler",
 		Severity: Error,
@@ -227,6 +237,14 @@ func (e *EvaluationInvalidNumberLiteral) Error() string {
 	return "Invalid number literal: " + e.expression
 }
 
+type EvaluationImmOverflow struct {
+	expression string
+}
+
+func (e *EvaluationImmOverflow) Error() string {
+	return "Immediate Overflow: " + e.expression
+}
+
 type EvaluationInvalidExpression struct {
 	expression string
 }
@@ -247,6 +265,10 @@ func (evaluationErrors) InvalidNumberLiteral(expression string) *EvaluationInval
 	return &EvaluationInvalidNumberLiteral{expression: expression}
 }
 
+func (evaluationErrors) ImmOverflow(expression string) *EvaluationImmOverflow {
+	return &EvaluationImmOverflow{expression: expression}
+}
+
 func (evaluationErrors) IsUnresolvedSymbolError(err error) bool {
 	_, ok := err.(*EvaluationUnresolvedSymbol)
 	return ok
@@ -259,5 +281,10 @@ func (evaluationErrors) IsInvalidNumberLiteralError(err error) bool {
 
 func (evaluationErrors) IsInvalidExpressionError(err error) bool {
 	_, ok := err.(*EvaluationInvalidExpression)
+	return ok
+}
+
+func (evaluationErrors) IsImmOverflowError(err error) bool {
+	_, ok := err.(*EvaluationImmOverflow)
 	return ok
 }
