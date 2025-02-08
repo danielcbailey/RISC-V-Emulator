@@ -366,7 +366,7 @@ func (inst *EmulatorInstance) executeIType(instruction uint32) {
 			}
 		case 0b011:
 			// SLTIU
-			if inst.regRead(rs1) < imm {
+			if inst.regRead(rs1) < uint32(int32(imm<<20) >> 20) {
 				inst.regWrite(rd, 1)
 			} else {
 				inst.regWrite(rd, 0)
