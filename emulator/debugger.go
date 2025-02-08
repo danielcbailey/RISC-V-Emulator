@@ -934,12 +934,12 @@ func getMemoryBase64(offset int) string {
 
 	blockVal, ok := liveEmulator.memory.Blocks[uint32(offset>>12)]
 
-	block := blockVal.Block
-
 	if !ok {
 		sendOutput("Failed to read gp memory.", true)
 		return ""
 	}
+
+	block := blockVal.Block
 
 	buf := new(bytes.Buffer)
 
