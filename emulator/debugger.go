@@ -929,7 +929,7 @@ func sendToClient(data interface{}) {
 	fmt.Print("Content-Length: " + strconv.Itoa(len(b)) + "\r\n\r\n" + string(b))
 }
 
-func getMemoryBase64(offset int) string {
+func getMemoryBase64(offset int, inverted bool) string {
 	count := 1024
 
 	blockVal, ok := liveEmulator.memory.Blocks[uint32(offset>>12)]
@@ -945,6 +945,10 @@ func getMemoryBase64(offset int) string {
 
 	start := (offset & 0xFFF) >> 2
 	end := (start + count)
+
+	if inverted && end > 1020 {
+		end = 1020
+	}
 
 	if end >= len(block) {
 		end = len(block) - 1
@@ -986,9 +990,10 @@ func sendScreenUpdates() {
 	// for memory: start at gp
 	// for stack: magic number 0x7FFFFFF0
 	gp := liveEmulator.registers[3]
+	sp := liveEmulator.registers[2]
 
-	mainMemory := getMemoryBase64(int(gp))
-	stackMemory := getMemoryBase64(0x7FFFFFF0)
+	mainMemory := getMemoryBase64(int(gp), false)
+	stackMemory := getMemoryBase64(int(sp), true)
 
 	packet := ScreenUpdate{
 		Width:   liveEmulator.display.width,
