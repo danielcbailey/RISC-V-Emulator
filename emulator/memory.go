@@ -1,9 +1,9 @@
 package emulator
-
+/*
 import(
 	"fmt"
 )
-
+*/
 func (inst *EmulatorInstance) memReadByte(addr uint32) uint32 {
 	// preparing bit mask
 	bitmask := uint32(0xFF)
@@ -108,7 +108,7 @@ func (inst *EmulatorInstance) memWriteRaw(addr, bitmask, value uint32) {
 	inst.dCache.Block[offset] = (inst.dCache.Block[offset] & ^bitmask) | (value << ((addr & 0x3) * 8))
 	if inst.pc < inst.profileIgnoreRangeStart || inst.pc >= inst.profileIgnoreRangeEnd {
 		if !inst.dCache.Initialized[offset] {
-			sendOutput(fmt.Sprintf("inc memUsage when first write to offset %d\n", offset), true)
+			//sendOutput(fmt.Sprintf("inc memUsage when first write to offset %d\n", offset), true)
 			// new memory access
 			inst.memUsage++
 		}
