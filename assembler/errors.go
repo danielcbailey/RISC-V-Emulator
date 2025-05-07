@@ -216,6 +216,15 @@ func (assemblyWarning) ImmediateBitsWillBeDiscarded(value string, r TextRange) D
 	}
 }
 
+func (assemblyWarning) ModifyingSpecialRegister(operand string, r TextRange) Diagnostic {
+	return Diagnostic{
+		Range:    r,
+		Message:  "Attempting to modify register '" + operand + "' marked as special",
+		Source:   "Assembler",
+		Severity: Warning,
+	}
+}
+
 // Evaluate-Specific Errors
 type evaluationErrors struct{}
 

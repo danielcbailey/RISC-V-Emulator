@@ -21,6 +21,10 @@ type labelLinkRequest struct {
 	isBranch  bool
 }
 
+type AssemblerConfig struct {
+	SpecialRegisters []string
+}
+
 type EvaluationType int
 
 const (

@@ -2,9 +2,20 @@ package assembler
 
 import (
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 )
+
+var assemblerConfig AssemblerConfig
+
+func GetConfig() AssemblerConfig {
+	return assemblerConfig
+}
+
+func SetConfig(config AssemblerConfig) {
+	assemblerConfig = config
+}
 
 func trimAndGetFrontDiffCount(str, cutset string) (string, int) {
 	strOut := strings.Trim(str, cutset)
@@ -55,7 +66,7 @@ func (a *AssembledResult) Evaluate(str string, fieldWidth int, signed bool) (Eva
 	// check if it is a base 16 integer (must have 0x prefix)
 	if len(str) > 2 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X') {
 		// check if too many digits for the fieldWidth
-		if len(str[2:])> fieldWidth/4 { 
+		if len(str[2:]) > fieldWidth/4 {
 			return EvaluationResult{}, EvaluationErrors.ImmOverflow(str)
 		}
 		// check if the rest of the string is valid
@@ -66,25 +77,29 @@ func (a *AssembledResult) Evaluate(str string, fieldWidth int, signed bool) (Eva
 		}
 		// convert to base 10
 		hexdigits := str[2:]
-		MSHdigit := hexdigits[0:1] // most significant hex digit
+		MSHdigit := hexdigits[0:1]                         // most significant hex digit
 		MSDecimal, e := strconv.ParseInt(MSHdigit, 16, 64) // decimal equivalent of MSHdigit
-		if signed && e == nil && MSDecimal > 7 && len(hexdigits) == fieldWidth/4 {  
+		if signed && e == nil && MSDecimal > 7 && len(hexdigits) == fieldWidth/4 {
 			switch fieldWidth {
-				case 12 : hexdigits = "F" + hexdigits
-				case 20 : hexdigits = "FFF" + hexdigits
+			case 12:
+				hexdigits = "F" + hexdigits
+			case 20:
+				hexdigits = "FFF" + hexdigits
 			}
 			value, err := strconv.ParseInt(hexdigits, 16, 64)
 			if err != nil {
 				return EvaluationResult{}, err
 			}
-			
+
 			switch fieldWidth {
-				case 12 : value = int64(int16(value))
-				case 20 : value = int64(int32(value))
+			case 12:
+				value = int64(int16(value))
+			case 20:
+				value = int64(int32(value))
 			}
-			
+
 			return EvaluationResult{Value: value, Type: EvaluationTypeIntegerLiteral, MatchedValue: str}, nil
-			
+
 		}
 		value, err := strconv.ParseInt(hexdigits, 16, 64)
 		if err != nil {
@@ -92,7 +107,6 @@ func (a *AssembledResult) Evaluate(str string, fieldWidth int, signed bool) (Eva
 		}
 		return EvaluationResult{Value: value, Type: EvaluationTypeUnsignedIntegerLiteral, MatchedValue: str}, nil
 	}
-
 
 	// check if it is a base 10 integer
 	for _, char := range str {
@@ -133,7 +147,7 @@ func (a *AssembledResult) EvaluateAndReportErrors(str string, fieldWidth int, si
 	} else if err != nil && EvaluationErrors.IsImmOverflowError(err) {
 		a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(str, fieldWidth, TextRange{
 			Start: TextPosition{Line: line, Char: charPos}, End: TextPosition{Line: line, Char: charPos + len(str)},
-		})) 
+		}))
 		return EvaluationResult{}, false
 	} else if err != nil {
 		a.Diagnostics = append(a.Diagnostics, Errors.AnonymousError(err.Error(), TextRange{
@@ -198,6 +212,15 @@ func (a *AssembledResult) parseRTypeInstruction(line string, diff, lineNum int, 
 		a.Diagnostics = append(a.Diagnostics, Errors.InvalidRegister(operand1, TextRange{
 			Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(operand1)},
 		}))
+		return 0, false
+	} else if slices.Contains(assemblerConfig.SpecialRegisters, operand1) {
+		// Attempting to modify a special register; throw warning
+		offset := len(opcode) + 1 + diff
+
+		a.Diagnostics = append(a.Diagnostics, Warnings.ModifyingSpecialRegister(operand1, TextRange{
+			Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(operand1)},
+		}))
+
 		return 0, false
 	}
 
@@ -423,7 +446,7 @@ func (a *AssembledResult) parseITypeInstruction(line string, diff, lineNum int, 
 	}
 	if op2.Type == EvaluationTypeIntegerLiteral || op2.Type == EvaluationTypeLabel {
 		// maximum of 12 bits
-		if immOverflow || op2.Value > 2047 || op2.Value < -2048 {  
+		if immOverflow || op2.Value > 2047 || op2.Value < -2048 {
 			offset := diff + len(opcode) + 1 + len(operand1) + 1 + len(parts[1]) + 1
 			a.Diagnostics = append(a.Diagnostics, Errors.ImmediateOverflow(parts[2], 12, TextRange{
 				Start: TextPosition{Line: lineNum, Char: offset}, End: TextPosition{Line: lineNum, Char: offset + len(parts[2])},
@@ -517,7 +540,7 @@ func (a *AssembledResult) parseITypeMemInstruction(line string, diff, lineNum in
 		}))
 		return 0, false
 	}
-    
+
 	// parse operand 3
 	op3, e := a.Evaluate(operand3, 0, false)
 	if e != nil || op3.Type != EvaluationTypeRegister {
