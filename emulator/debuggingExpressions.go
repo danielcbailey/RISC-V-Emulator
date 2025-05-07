@@ -986,6 +986,27 @@ var functions = map[string]evaluationFunction{
 			}, nil
 		},
 	},
+
+	"binary": {
+		name:          "binary",
+		argumentNames: []string{"value"},
+		function: func(args []evaluationToken) (evaluationToken, error) {
+			if args[0].dataType != "int" && !strings.Contains(args[0].dataType, "*") {
+				return evaluationToken{}, errors.New("invalid type for hex got " + args[0].dataType)
+			}
+
+			result := "0b" + strconv.FormatUint(uint64(args[0].trueValue.(int)), 2)
+			evRes := args[0].value
+			evRes.String = result
+
+			return evaluationToken{
+				dataType:  args[0].dataType,
+				value:     evRes,
+				trueValue: args[0].trueValue,
+				strValue:  result,
+			}, nil
+		},
+	},
 }
 
 func EvaluateExpression(str string) (EvaluationResult, error) {
