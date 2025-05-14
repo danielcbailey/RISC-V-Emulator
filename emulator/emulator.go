@@ -3,8 +3,8 @@ package emulator
 import (
 	"strconv"
 
-	"github.gatech.edu/ECEInnovation/RISC-V-Emulator/assembler"
 	"fmt"
+	"github.gatech.edu/ECEInnovation/RISC-V-Emulator/assembler"
 )
 
 func (inst *EmulatorInstance) regRead(reg uint32) uint32 {
@@ -182,7 +182,7 @@ func (inst *EmulatorInstance) Emulate(startAddr uint32) {
 
 		inst.executedInstructions++
 	}
-	if (inst.di >= inst.runtimeLimit){
+	if inst.di >= inst.runtimeLimit {
 		sendOutput(fmt.Sprintf("***Infinite Loop? DI: %d***", inst.di), true)
 	}
 }
@@ -366,7 +366,7 @@ func (inst *EmulatorInstance) executeIType(instruction uint32) {
 			}
 		case 0b011:
 			// SLTIU
-			if inst.regRead(rs1) < uint32(int32(imm<<20) >> 20) {
+			if inst.regRead(rs1) < uint32(int32(imm<<20)>>20) {
 				inst.regWrite(rd, 1)
 			} else {
 				inst.regWrite(rd, 0)

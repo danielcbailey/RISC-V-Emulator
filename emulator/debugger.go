@@ -929,34 +929,43 @@ func sendToClient(data interface{}) {
 	fmt.Print("Content-Length: " + strconv.Itoa(len(b)) + "\r\n\r\n" + string(b))
 }
 
-func getMemoryBase64(offset int, inverted bool) string {
+func getMemoryBase64(offset int, inverted bool, blockCount int) string {
 	count := 1024
 
-	blockVal, ok := liveEmulator.memory.Blocks[uint32(offset>>12)]
-
-	if !ok {
-		sendOutput("Failed to read gp memory.", true)
-		return ""
-	}
-
-	block := blockVal.Block
+	initialBlockIndex := uint32(offset >> 12)
 
 	buf := new(bytes.Buffer)
 
-	start := (offset & 0xFFF) >> 2
-	end := (start + count)
+	for i := 0; i < blockCount; i++ {
+		blockVal, ok := liveEmulator.memory.Blocks[uint32(i)+initialBlockIndex]
 
-	if inverted && end > 1020 {
-		end = 1020
-	}
+		if !ok {
+			sendOutput("Failed to read gp memory.", true)
+			return ""
+		}
 
-	if end >= len(block) {
-		end = len(block) - 1
-	}
+		block := blockVal.Block
 
-	// encode block into base64
-	for i := start; i <= end; i++ {
-		binary.Write(buf, binary.BigEndian, block[i])
+		start := 0
+
+		if i == 0 {
+			start = (offset & 0xFFF) >> 2
+		}
+
+		end := (start + count)
+
+		if inverted && end > 1020 {
+			end = 1020
+		}
+
+		if end >= len(block) {
+			end = len(block) - 1
+		}
+
+		// encode block into base64
+		for j := start; j <= end; j++ {
+			binary.Write(buf, binary.BigEndian, block[j])
+		}
 	}
 
 	bufBytes := buf.Bytes()
@@ -992,8 +1001,8 @@ func sendScreenUpdates() {
 	gp := liveEmulator.registers[3]
 	sp := liveEmulator.registers[2]
 
-	mainMemory := getMemoryBase64(int(gp), false)
-	stackMemory := getMemoryBase64(int(sp), true)
+	mainMemory := getMemoryBase64(int(gp), false, 2)
+	stackMemory := getMemoryBase64(int(sp), true, 1)
 
 	packet := ScreenUpdate{
 		Width:   liveEmulator.display.width,
@@ -1001,11 +1010,12 @@ func sendScreenUpdates() {
 		Updates: liveEmulator.display.GetEntireScreen(),
 		Status:  statusString,
 		Stats: map[string]int{
-			"di":  int(liveEmulator.di),
-			"mem": int(liveEmulator.memUsage) + len(liveAssembledResult.ProgramData),
-			"reg": int(liveEmulator.regUsage),
-			"si":  len(liveAssembledResult.ProgramText),
-			"pc":  int(liveEmulator.pc),
+			"di":        int(liveEmulator.di),
+			"mem":       int(liveEmulator.memUsage) + len(liveAssembledResult.ProgramData),
+			"allocated": int(len(liveAssembledResult.ProgramData)),
+			"reg":       int(liveEmulator.regUsage),
+			"si":        len(liveAssembledResult.ProgramText),
+			"pc":        int(liveEmulator.pc),
 		},
 		Memory: map[string]string{
 			"main":  mainMemory,
