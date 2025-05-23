@@ -929,6 +929,14 @@ func sendToClient(data interface{}) {
 	fmt.Print("Content-Length: " + strconv.Itoa(len(b)) + "\r\n\r\n" + string(b))
 }
 
+func encodeByteBufferBase64(buf *bytes.Buffer) string {
+	bufBytes := buf.Bytes()
+
+	base64Encoded := base64.StdEncoding.EncodeToString(bufBytes)
+
+	return base64Encoded
+}
+
 func getMemoryBase64(offset int, inverted bool, blockCount int) string {
 	count := 1024
 
@@ -940,8 +948,8 @@ func getMemoryBase64(offset int, inverted bool, blockCount int) string {
 		blockVal, ok := liveEmulator.memory.Blocks[uint32(i)+initialBlockIndex]
 
 		if !ok {
-			sendOutput("Failed to read gp memory.", true)
-			return ""
+			// potentially asked for more memory than currently allocated, only return what was successful
+			return encodeByteBufferBase64(buf)
 		}
 
 		block := blockVal.Block
@@ -968,11 +976,7 @@ func getMemoryBase64(offset int, inverted bool, blockCount int) string {
 		}
 	}
 
-	bufBytes := buf.Bytes()
-
-	base64Encoded := base64.StdEncoding.EncodeToString(bufBytes)
-
-	return base64Encoded
+	return encodeByteBufferBase64(buf)
 }
 
 func sendScreenUpdates() {
