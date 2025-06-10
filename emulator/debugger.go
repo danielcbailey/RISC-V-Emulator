@@ -406,7 +406,7 @@ func initDebugger(assemblyPath string, assignmentPath string, seq int, randomSee
 				stdOutBuilder.WriteByte(b)
 			}
 		},
-		RuntimeLimit: 1000000, // 100,000 instructions, which doesn't include the CPP code
+		RuntimeLimit: 1000000, // 1,000,000 instructions, which doesn't include the CPP code
 	}
 
 	if hasAssignment {
