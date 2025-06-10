@@ -127,7 +127,7 @@ func runStandaloneEmulator(elfFilePath string, assemblyPath string, conn *websoc
 			conn.WriteMessage(websocket.TextMessage, messageBytes)
 			wsMutex.Unlock()
 		},
-		RuntimeLimit: 1000000, // 100,000 instructions, which doesn't include the CPP code
+		RuntimeLimit: 1000000, // 1,000,000 instructions, which doesn't include the CPP code
 	}
 
 	emulator := NewEmulator(config)
